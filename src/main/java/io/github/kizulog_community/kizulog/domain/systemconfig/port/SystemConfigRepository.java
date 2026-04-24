@@ -9,7 +9,7 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfi
  * システム設定リポジトリインターフェース（Output Port）.
  *
  * <p>システム設定の永続化操作を定義する。
- * 実装はインフラ層が担い、ドメイン層はこのインターフェースのみに依存する。</p>
+ * 実装はインフラ層が担い、ドメイン層はこのインターフェースのみ参照する。</p>
  *
  * <p>system_configテーブルはimmutableテーブルのため、
  * 更新・削除操作は提供しない。変更は新バージョンのINSERTで行う。</p>
