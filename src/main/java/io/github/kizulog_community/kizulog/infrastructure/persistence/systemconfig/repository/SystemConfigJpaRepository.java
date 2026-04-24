@@ -1,5 +1,7 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemconfig.repository;
 
+import java.time.OffsetDateTime;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -10,7 +12,7 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemconf
 public interface SystemConfigJpaRepository
         extends JpaRepository<SystemConfigEntity, SystemConfigId> {
 
-    // 指定されたkeyの最新バージョン（versionの最大値）を取得
+    // 指定されたkeyの最新バージョンを取得
     @Query("""
             SELECT s FROM SystemConfigEntity s
             WHERE s.id.key = :key
@@ -21,4 +23,11 @@ public interface SystemConfigJpaRepository
             )
             """)
     Optional<SystemConfigEntity> findLatestByKey(@Param("key") String key);
+
+    // 指定されたkeyの指定バージョンを取得
+    Optional<SystemConfigEntity> findByIdKeyAndIdVersion(String key, OffsetDateTime version);
+
+    // 指定されたkeyの全バージョンを取得
+    List<SystemConfigEntity> findByIdKey(String key);
+    
 }

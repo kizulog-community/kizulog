@@ -23,4 +23,5 @@ public class SystemConfigId implements Serializable {
 
     @Column(name = "version", nullable = false)
     private OffsetDateTime version;
+    
 }
