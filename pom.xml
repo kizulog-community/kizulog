@@ -61,6 +61,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- Thymeleaf（セットアップウィザード画面） -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-thymeleaf</artifactId>
+        </dependency>
         <!-- Validation（入力バリデーション） -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
