@@ -6,7 +6,7 @@ import java.util.Optional;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
 
 /**
- * システム設定リポジトリインターフェース（Output Port）.
+ * システム設定リポジトリインターフェース（Output Port）
  *
  * <p>システム設定の永続化操作を定義する。
  * 実装はインフラ層が担い、ドメイン層はこのインターフェースのみ参照する。</p>

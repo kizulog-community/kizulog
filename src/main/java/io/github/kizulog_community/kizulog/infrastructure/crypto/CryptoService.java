@@ -10,6 +10,8 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
+
 /**
  * 暗号・復号化サービス
  *
@@ -21,7 +23,7 @@ import org.springframework.stereotype.Component;
  * @author Jun Kobayashi
  */
 @Component
-public class CryptoService {
+public class CryptoService implements CryptoPort {
 
     /** GCMの認証タグ長（ビット） */
     private static final int GCM_TAG_LENGTH = 128;
