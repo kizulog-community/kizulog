@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>KizuLog-セットアップ-Step1:OIDC設定</title>
+</head>
+<body>
+    <h1>KizuLog セットアップ</h1>
+    <h2>Step 1 / 3 : OIDC設定</h2>
+
+    <form th:action="@{/setup/step1}" method="post">
+        <div th:each="oidc, stat : ${sessionData.oidcSettings}">
+            <h3>OIDC設定 #<span th:text="${stat.index + 1}"></span></h3>
+            <div>
+                <label>識別子：</label>
+                <input type="text"
+                       th:name="'oidcSettings[' + ${stat.index} + '].id'"
+                       th:value="${oidc.id}" required/>
+            </div>
+            <div>
+                <label>Issuer URI：</label>
+                <input type="url"
+                       th:name="'oidcSettings[' + ${stat.index} + '].uri'"
+                       th:value="${oidc.uri}" required/>
+            </div>
+            <div>
+                <label>Client ID：</label>
+                <input type="text"
+                       th:name="'oidcSettings[' + ${stat.index} + '].clientId'"
+                       th:value="${oidc.clientId}" required/>
+            </div>
+            <div>
+                <label>Client Secret：</label>
+                <input type="password"
+                       th:name="'oidcSettings[' + ${stat.index} + '].clientSecret'"
+                       required/>
+            </div>
+        </div>
+        <button type="submit">次へ</button>
+    </form>
+</body>
+</html>

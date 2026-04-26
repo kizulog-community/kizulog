@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>KizuLog-セットアップ-Step3:確認</title>
+</head>
+<body>
+    <h1>KizuLog セットアップ</h1>
+    <h2>Step 3 / 3 : 確認</h2>
+
+    <h3>OIDC設定</h3>
+    <div th:each="oidc, stat : ${sessionData.oidcSettings}">
+        <p>識別子：<span th:text="${oidc.id}"></span></p>
+        <p>Issuer URI：<span th:text="${oidc.uri}"></span></p>
+        <p>Client ID：<span th:text="${oidc.clientId}"></span></p>
+        <p>Client Secret：********</p>
+    </div>
+
+    <h3>言語設定</h3>
+    <p>デフォルト言語：<span th:text="${sessionData.defaultLanguage?.displayName}"></span></p>
+    <p>利用可能言語：<span th:text="${sessionData.availableLanguages}"></span></p>
+
+    <h3>タイムゾーン設定</h3>
+    <p>デフォルトタイムゾーン：<span th:text="${sessionData.defaultTimezone?.displayName}"></span></p>
+    <p>利用可能タイムゾーン：<span th:text="${sessionData.availableTimezones}"></span></p>
+
+    <form th:action="@{/setup/step3}" method="post">
+        <button type="submit">保存して完了</button>
+    </form>
+</body>
+</html>

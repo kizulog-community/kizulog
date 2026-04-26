@@ -1,6 +1,9 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 
 import java.io.IOException;
+
+import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
+import io.github.kizulog_community.kizulog.domain.systemconfig.service.SystemConfigService;
 import jakarta.servlet.Filter;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -8,9 +11,6 @@ import jakarta.servlet.ServletRequest;
 import jakarta.servlet.ServletResponse;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.stereotype.Component;
-import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
-import io.github.kizulog_community.kizulog.domain.systemconfig.service.SystemConfigService;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -21,7 +21,6 @@ import lombok.RequiredArgsConstructor;
  *
  * @author Jun Kobayashi
  */
-@Component
 @RequiredArgsConstructor
 public class SetupCheckFilter implements Filter {
 
@@ -43,17 +42,24 @@ public class SetupCheckFilter implements Filter {
 
         String path = request.getRequestURI();
 
-        boolean isSetupPath = path.startsWith(SETUP_PATH);
-        boolean isSetupCompleted = isSetupCompleted();
-
-        // 未セットアップ かつ セットアップ画面以外 → セットアップ画面へリダイレクト
-        if (!isSetupCompleted && !isSetupPath) {
-            response.sendRedirect(SETUP_PATH + "/step1");
+        // 静的リソースはフィルター対象外
+        if (path.startsWith("/css/") || path.startsWith("/js/")
+                || path.startsWith("/images/") || path.startsWith("/favicon")) {
+            chain.doFilter(req, res);
             return;
         }
 
-        // セットアップ完了済み かつ セットアップ画面へのアクセス → 403
+        boolean isSetupPath = path.startsWith(SETUP_PATH);
+        boolean isSetupCompleted = isSetupCompleted();
+
+        if (!isSetupCompleted && !isSetupPath) {
+            // 未セットアップ かつ セットアップ画面以外 → リダイレクト
+            response.sendRedirect(request.getContextPath() + SETUP_PATH + "/step1");
+            return;
+        }
+
         if (isSetupCompleted && isSetupPath) {
+            // セットアップ完了済み かつ セットアップ画面 → 403
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }

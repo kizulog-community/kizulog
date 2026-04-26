@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>KizuLog-セットアップ-Step2:基本設定</title>
+</head>
+<body>
+    <h1>KizuLog セットアップ</h1>
+    <h2>Step 2 / 3 : 基本設定</h2>
+
+    <form th:action="@{/setup/step2}" method="post">
+        <div>
+            <label>デフォルト言語：</label>
+            <select name="defaultLanguage">
+                <option th:each="lang : ${languages}"
+                        th:value="${lang.name()}"
+                        th:text="${lang.displayName}"
+                        th:selected="${lang == sessionData.defaultLanguage}">
+                </option>
+            </select>
+        </div>
+        <div>
+            <label>利用可能言語：</label>
+            <div th:each="lang : ${languages}">
+                <input type="checkbox"
+                       name="availableLanguages"
+                       th:value="${lang.name()}"
+                       th:checked="${sessionData.availableLanguages.contains(lang)}"/>
+                <span th:text="${lang.displayName}"></span>
+            </div>
+        </div>
+        <div>
+            <label>デフォルトタイムゾーン：</label>
+            <select name="defaultTimezone">
+                <option th:each="tz : ${timezones}"
+                        th:value="${tz.name()}"
+                        th:text="${tz.displayName}"
+                        th:selected="${tz == sessionData.defaultTimezone}">
+                </option>
+            </select>
+        </div>
+        <div>
+            <label>利用可能タイムゾーン：</label>
+            <div th:each="tz : ${timezones}">
+                <input type="checkbox"
+                       name="availableTimezones"
+                       th:value="${tz.name()}"
+                       th:checked="${sessionData.availableTimezones.contains(tz)}"/>
+                <span th:text="${tz.displayName}"></span>
+            </div>
+        </div>
+        <button type="submit">次へ</button>
+    </form>
+</body>
+</html>
