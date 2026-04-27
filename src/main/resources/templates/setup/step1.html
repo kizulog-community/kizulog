@@ -2,41 +2,282 @@
 <html xmlns:th="http://www.thymeleaf.org">
 <head>
     <meta charset="UTF-8">
-    <title>KizuLog-セットアップ-Step1:OIDC設定</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KizuLog</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .setup-card { max-width: 640px; margin: 60px auto; }
+        .step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.875rem; }
+        .step.active { background-color: #0d6efd; color: white; }
+        .step.todo { background-color: #dee2e6; color: #6c757d; }
+        .step-line { flex: 1; height: 2px; background-color: #dee2e6; margin: 0 8px; }
+    </style>
 </head>
 <body>
-    <h1>KizuLog セットアップ</h1>
-    <h2>Step 1 / 3 : OIDC設定</h2>
+<div class="setup-card px-3">
+    <div class="text-center mb-4">
+        <h1 class="h3 fw-bold text-primary">
+            <i class="bi bi-shield-lock-fill me-2"></i><span th:text="#{setup.title}"></span>
+        </h1>
+        <p class="text-muted mb-0" th:text="#{setup.subtitle}"></p>
+    </div>
 
-    <form th:action="@{/setup/step1}" method="post">
-        <div th:each="oidc, stat : ${sessionData.oidcSettings}">
-            <h3>OIDC設定 #<span th:text="${stat.index + 1}"></span></h3>
-            <div>
-                <label>識別子：</label>
-                <input type="text"
-                       th:name="'oidcSettings[' + ${stat.index} + '].id'"
-                       th:value="${oidc.id}" required/>
-            </div>
-            <div>
-                <label>Issuer URI：</label>
-                <input type="url"
-                       th:name="'oidcSettings[' + ${stat.index} + '].uri'"
-                       th:value="${oidc.uri}" required/>
-            </div>
-            <div>
-                <label>Client ID：</label>
-                <input type="text"
-                       th:name="'oidcSettings[' + ${stat.index} + '].clientId'"
-                       th:value="${oidc.clientId}" required/>
-            </div>
-            <div>
-                <label>Client Secret：</label>
-                <input type="password"
-                       th:name="'oidcSettings[' + ${stat.index} + '].clientSecret'"
-                       required/>
-            </div>
+    <div class="d-flex align-items-center justify-content-center mb-4">
+        <div class="step active">1</div>
+        <div class="step-line"></div>
+        <div class="step todo">2</div>
+        <div class="step-line"></div>
+        <div class="step todo">3</div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h5 class="card-title mb-1" th:text="#{setup.step1.title}"></h5>
+            <p class="text-muted small mb-4" th:text="#{setup.step1.description}"></p>
+
+            <form th:action="@{/setup/step1}" method="post" id="step1Form">
+                <div id="oidcContainer">
+                    <div th:each="oidc, stat : ${sessionData.oidcSettings}"
+                         class="oidc-block border rounded p-3 mb-3 bg-light"
+                         th:data-index="${stat.index}">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">
+                                <i class="bi bi-key me-1"></i>
+                                OIDC #<span class="oidc-number" th:text="${stat.index + 1}"></span>
+                            </h6>
+                            <button type="button" class="btn btn-sm btn-outline-danger delete-btn"
+                                    th:disabled="${stat.count == 1}"
+                                    onclick="deleteOidc(this)">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <span th:text="#{setup.step1.label.id}"></span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control"
+                                   th:name="'oidcSettings[' + ${stat.index} + '].id'"
+                                   th:value="${oidc.id}"
+                                   th:placeholder="#{setup.step1.placeholder.id}"
+                                   required/>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <span th:text="#{setup.step1.label.uri}"></span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group">
+                                <input type="url" class="form-control oidc-uri"
+                                       th:name="'oidcSettings[' + ${stat.index} + '].uri'"
+                                       th:value="${oidc.uri}"
+                                       th:placeholder="#{setup.step1.placeholder.uri}"
+                                       required/>
+                                <button type="button" class="btn btn-outline-secondary check-btn"
+                                        onclick="checkOidc(this)">
+                                    <i class="bi bi-wifi me-1"></i>
+                                    <span th:text="#{setup.step1.button.checkConnection}"></span>
+                                </button>
+                            </div>
+                            <div class="oidc-result mt-1 small"></div>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label fw-semibold">
+                                <span th:text="#{setup.step1.label.clientId}"></span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text" class="form-control"
+                                   th:name="'oidcSettings[' + ${stat.index} + '].clientId'"
+                                   th:value="${oidc.clientId}"
+                                   th:placeholder="#{setup.step1.placeholder.clientId}"
+                                   required/>
+                        </div>
+                        <div class="mb-0">
+                            <label class="form-label fw-semibold">
+                                <span th:text="#{setup.step1.label.clientSecret}"></span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="password" class="form-control"
+                                   th:name="'oidcSettings[' + ${stat.index} + '].clientSecret'"
+                                   th:placeholder="#{setup.step1.placeholder.clientSecret}"
+                                   required/>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <button type="button" class="btn btn-outline-primary btn-sm"
+                            onclick="addOidc()">
+                        <i class="bi bi-plus-circle me-1"></i>
+                        OIDC設定を追加
+                    </button>
+                </div>
+
+                <div class="d-flex justify-content-end">
+                    <button type="submit" class="btn btn-primary px-4"
+                            id="nextBtn" disabled>
+                        <span th:text="#{setup.button.next}"></span>
+                        <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+            </form>
         </div>
-        <button type="submit">次へ</button>
-    </form>
+    </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script th:inline="javascript">
+    const i18n = {
+        checking: [[#{setup.step1.checking}]],
+        checkConnection: [[#{setup.step1.button.checkConnection}]],
+        labelId: [[#{setup.step1.label.id}]],
+        labelUri: [[#{setup.step1.label.uri}]],
+        labelClientId: [[#{setup.step1.label.clientId}]],
+        labelClientSecret: [[#{setup.step1.label.clientSecret}]],
+        placeholderId: [[#{setup.step1.placeholder.id}]],
+        placeholderUri: [[#{setup.step1.placeholder.uri}]],
+        placeholderClientId: [[#{setup.step1.placeholder.clientId}]],
+        placeholderClientSecret: [[#{setup.step1.placeholder.clientSecret}]]
+    };
+
+    // 接続確認済みフラグを管理するSet（ブロックのDOM要素を追跡）
+    const verifiedBlocks = new Set();
+
+    function updateNextButton() {
+        const blocks = document.querySelectorAll('.oidc-block');
+        const allVerified = blocks.length > 0 &&
+                [...blocks].every(b => verifiedBlocks.has(b));
+        document.getElementById('nextBtn').disabled = !allVerified;
+    }
+
+    function checkOidc(btn) {
+        const block = btn.closest('.oidc-block');
+        const issuerUri = block.querySelector('.oidc-uri').value;
+        const resultDiv = block.querySelector('.oidc-result');
+
+        if (!issuerUri) {
+            resultDiv.innerHTML = '<span class="text-danger"><i class="bi bi-exclamation-circle me-1"></i>' + i18n.checking + '</span>';
+            verifiedBlocks.delete(block);
+            updateNextButton();
+            return;
+        }
+
+        resultDiv.innerHTML = '<span class="text-muted"><i class="bi bi-arrow-repeat me-1"></i>' + i18n.checking + '</span>';
+        btn.disabled = true;
+
+        fetch('/setup/check-oidc', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ issuerUri: issuerUri })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.success) {
+                resultDiv.innerHTML = '<span class="text-success"><i class="bi bi-check-circle me-1"></i>' + data.message + '</span>';
+                verifiedBlocks.add(block);
+            } else {
+                resultDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>' + data.message + '</span>';
+                verifiedBlocks.delete(block);
+            }
+            updateNextButton();
+        })
+        .catch(() => {
+            resultDiv.innerHTML = '<span class="text-danger"><i class="bi bi-x-circle me-1"></i>通信エラーが発生しました</span>';
+            verifiedBlocks.delete(block);
+            updateNextButton();
+        })
+        .finally(() => {
+            btn.disabled = false;
+        });
+    }
+
+    function getNextIndex() {
+        const blocks = document.querySelectorAll('.oidc-block');
+        return blocks.length;
+    }
+
+    function renumberBlocks() {
+        document.querySelectorAll('.oidc-block').forEach((block, i) => {
+            // インデックス更新
+            block.dataset.index = i;
+            block.querySelector('.oidc-number').textContent = i + 1;
+            // name属性更新
+            block.querySelectorAll('input').forEach(input => {
+                input.name = input.name.replace(/oidcSettings\[\d+\]/, 'oidcSettings[' + i + ']');
+            });
+            // 削除ボタンの有効/無効
+            const deleteBtn = block.querySelector('.delete-btn');
+            deleteBtn.disabled = document.querySelectorAll('.oidc-block').length === 1;
+        });
+        updateNextButton();
+    }
+
+    function addOidc() {
+        const index = getNextIndex();
+        const container = document.getElementById('oidcContainer');
+
+        const block = document.createElement('div');
+        block.className = 'oidc-block border rounded p-3 mb-3 bg-light';
+        block.dataset.index = index;
+        block.innerHTML = `
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="mb-0"><i class="bi bi-key me-1"></i>OIDC #<span class="oidc-number">${index + 1}</span></h6>
+                <button type="button" class="btn btn-sm btn-outline-danger delete-btn" onclick="deleteOidc(this)">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">${i18n.labelId} <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="oidcSettings[${index}].id"
+                       placeholder="${i18n.placeholderId}" required/>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">${i18n.labelUri} <span class="text-danger">*</span></label>
+                <div class="input-group">
+                    <input type="url" class="form-control oidc-uri" name="oidcSettings[${index}].uri"
+                           placeholder="${i18n.placeholderUri}" required/>
+                    <button type="button" class="btn btn-outline-secondary check-btn" onclick="checkOidc(this)">
+                        <i class="bi bi-wifi me-1"></i>${i18n.checkConnection}
+                    </button>
+                </div>
+                <div class="oidc-result mt-1 small"></div>
+            </div>
+            <div class="mb-3">
+                <label class="form-label fw-semibold">${i18n.labelClientId} <span class="text-danger">*</span></label>
+                <input type="text" class="form-control" name="oidcSettings[${index}].clientId"
+                       placeholder="${i18n.placeholderClientId}" required/>
+            </div>
+            <div class="mb-0">
+                <label class="form-label fw-semibold">${i18n.labelClientSecret} <span class="text-danger">*</span></label>
+                <input type="password" class="form-control" name="oidcSettings[${index}].clientSecret"
+                       placeholder="${i18n.placeholderClientSecret}" required/>
+            </div>
+        `;
+        container.appendChild(block);
+        renumberBlocks();
+    }
+
+    function deleteOidc(btn) {
+        const block = btn.closest('.oidc-block');
+        verifiedBlocks.delete(block);
+        block.remove();
+        renumberBlocks();
+    }
+
+    // URIが変更されたら接続確認をリセット
+    document.getElementById('oidcContainer').addEventListener('input', function(e) {
+        if (e.target.classList.contains('oidc-uri')) {
+            const block = e.target.closest('.oidc-block');
+            verifiedBlocks.delete(block);
+            block.querySelector('.oidc-result').innerHTML = '';
+            updateNextButton();
+        }
+    });
+
+    // 初期状態で次へボタンを無効化
+    updateNextButton();
+</script>
 </body>
 </html>

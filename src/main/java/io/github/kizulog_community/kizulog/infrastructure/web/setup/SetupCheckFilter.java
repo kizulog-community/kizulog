@@ -27,6 +27,9 @@ public class SetupCheckFilter implements Filter {
     /** セットアップ画面のパスプレフィックス */
     private static final String SETUP_PATH = "/setup";
 
+    /** 完了画面のパス */
+    private static final String COMPLETE_PATH = "/setup/complete";
+
     /** システム設定サービス */
     private final SystemConfigService systemConfigService;
 
@@ -49,17 +52,21 @@ public class SetupCheckFilter implements Filter {
             return;
         }
 
+        // 完了画面は常にアクセス許可
+        if (path.equals(COMPLETE_PATH)) {
+            chain.doFilter(req, res);
+            return;
+        }
+
         boolean isSetupPath = path.startsWith(SETUP_PATH);
         boolean isSetupCompleted = isSetupCompleted();
 
         if (!isSetupCompleted && !isSetupPath) {
-            // 未セットアップ かつ セットアップ画面以外 → リダイレクト
-            response.sendRedirect(request.getContextPath() + SETUP_PATH + "/step1");
+            response.sendRedirect(request.getContextPath() + SETUP_PATH + "/step0");
             return;
         }
 
         if (isSetupCompleted && isSetupPath) {
-            // セットアップ完了済み かつ セットアップ画面 → 403
             response.sendError(HttpServletResponse.SC_FORBIDDEN);
             return;
         }

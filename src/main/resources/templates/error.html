@@ -3,29 +3,29 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>KizuLog</title>
+    <title>KizuLog - ERROR</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
     <style>
         body { background-color: #f8f9fa; }
-        .setup-card { max-width: 640px; margin: 60px auto; }
+        .error-card { max-width: 480px; margin: 60px auto; }
     </style>
 </head>
 <body>
-<div class="setup-card px-3">
+<div class="error-card px-3">
     <div class="text-center mb-4">
         <h1 class="h3 fw-bold text-primary">
-            <i class="bi bi-shield-lock-fill me-2"></i><span th:text="#{setup.title}"></span>
+            <i class="bi bi-shield-lock-fill me-2"></i>KizuLog
         </h1>
     </div>
 
     <div class="card shadow-sm text-center">
         <div class="card-body p-5">
             <div class="mb-3">
-                <i class="bi bi-check-circle-fill text-success" style="font-size: 3rem;"></i>
+                <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 3rem;"></i>
             </div>
-            <h4 class="fw-bold mb-2" th:text="#{setup.complete.title}"></h4>
-            <p class="text-muted" th:text="#{setup.complete.message}"></p>
+            <h4 class="fw-bold mb-2" th:text="${status}"></h4>
+            <p class="text-muted" th:text="${error}"></p>
         </div>
     </div>
 </div>

@@ -14,7 +14,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public enum SupportedLanguage {
 
-    JA(Locale.JAPANESE, "日本語");
+    JA(Locale.JAPANESE, "日本語"),
+    EN(Locale.ENGLISH, "English");
 
     /** ロケール（Java標準・BCP47準拠） */
     private final Locale locale;

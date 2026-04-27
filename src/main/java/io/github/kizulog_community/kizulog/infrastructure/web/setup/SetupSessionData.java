@@ -27,6 +27,9 @@ public class SetupSessionData implements Serializable {
 
     private static final long serialVersionUID = 758730933041353765L;
 
+    /** セットアップ言語 */
+    private SupportedLanguage setupLanguage;
+
 	/** OIDC設定リスト */
     private List<OidcSetting> oidcSettings = new ArrayList<>();
 
