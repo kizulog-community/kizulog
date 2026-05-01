@@ -25,7 +25,7 @@ public class SecurityConfig {
      * @throws Exception 設定エラー
      */
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http.authorizeHttpRequests(auth -> auth
             .requestMatchers("/setup/**").permitAll()
             .anyRequest().permitAll()  // 暫定：全許可（OIDC実装後に変更）

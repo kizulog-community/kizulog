@@ -51,8 +51,6 @@
                     <div class="col-4 text-muted" th:text="#{setup.step4.label.host}"></div>
                     <div class="col-8" th:text="${sessionData.host}"></div>
                     <div th:each="oidc : ${sessionData.oidcSettings}">
-                        <div class="col-4 text-muted" th:text="#{setup.step4.label.id}"></div>
-                        <div class="col-8" th:text="${oidc.id}"></div>
                         <div class="col-4 text-muted" th:text="#{setup.step4.label.uri}"></div>
                         <div class="col-8 text-break" th:text="${oidc.uri}"></div>
                         <div class="col-4 text-muted" th:text="#{setup.step4.label.clientId}"></div>
@@ -108,10 +106,12 @@
             </h6>
             <div class="border rounded p-3 mb-4 bg-light small">
                 <div class="row g-2">
-                    <div class="col-4 text-muted" th:text="#{setup.step4.label.name}"></div>
-                    <div class="col-8" th:text="${sessionData.adminName}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step4.label.email}"></div>
-                    <div class="col-8" th:text="${sessionData.adminEmail}"></div>
+                    <div class="col-4 text-muted" th:text="#{setup.step4.label.iss}"></div>
+                    <div class="col-8 text-break" th:text="${sessionData.adminIss}"></div>
+                    <div class="col-4 text-muted" th:text="#{setup.step4.label.aud}"></div>
+                    <div class="col-8" th:text="${sessionData.adminAud}"></div>
+                    <div class="col-4 text-muted" th:text="#{setup.step4.label.sub}"></div>
+                    <div class="col-8 text-break" th:text="${sessionData.adminSub}"></div>
                 </div>
             </div>
 

@@ -19,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 
@@ -118,7 +119,29 @@ public class SetupController {
      * @return Step2へリダイレクト
      */
     @PostMapping("/step1")
-    public String step1Submit(@ModelAttribute Step1FormData formData) {
+    public String step1Submit(
+    		@ModelAttribute Step1FormData formData, RedirectAttributes redirectAttributes) {
+        if (formData.getAvailableLanguages() == null
+                || formData.getAvailableLanguages().isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "validation.availableLanguages.empty");
+            return "redirect:/setup/step1";
+        }
+        if (formData.getAvailableTimezones() == null
+                || formData.getAvailableTimezones().isEmpty()) {
+            redirectAttributes.addFlashAttribute("error", "validation.availableTimezones.empty");
+            return "redirect:/setup/step1";
+        }
+        if (formData.getDefaultLanguage() == null
+                || !formData.getAvailableLanguages().contains(formData.getDefaultLanguage())) {
+            redirectAttributes.addFlashAttribute("error", "validation.defaultLanguage.invalid");
+            return "redirect:/setup/step1";
+        }
+        if (formData.getDefaultTimezone() == null
+                || !formData.getAvailableTimezones().contains(formData.getDefaultTimezone())) {
+            redirectAttributes.addFlashAttribute("error", "validation.defaultTimezone.invalid");
+            return "redirect:/setup/step1";
+        }
+
         setupSessionData.setDefaultLanguage(formData.getDefaultLanguage());
         setupSessionData.setAvailableLanguages(formData.getAvailableLanguages());
         setupSessionData.setDefaultTimezone(formData.getDefaultTimezone());
@@ -154,8 +177,13 @@ public class SetupController {
     @PostMapping("/step2")
     public String step2Submit(@ModelAttribute Step2FormData formData) {
         setupSessionData.setHost(formData.getHost());
+
+        // SYSTEM_TENANTのOIDC識別子は'master'固定
+        OidcSetting oidcSetting = formData.getOidcSetting();
+        oidcSetting.setId("master");
+
         setupSessionData.getOidcSettings().clear();
-        setupSessionData.getOidcSettings().add(formData.getOidcSetting());
+        setupSessionData.getOidcSettings().add(oidcSetting);
         return "redirect:/setup/step3";
     }
 
@@ -277,8 +305,9 @@ public class SetupController {
      */
     @GetMapping("/callback")
     public String oidcCallback(
-    		@RequestParam String code, @RequestParam String state
-    		, HttpSession session) {
+            @RequestParam String code,
+            @RequestParam String state,
+            HttpSession session) {
 
         String savedState = (String) session.getAttribute("oidc_state");
         if (!state.equals(savedState)) {
@@ -287,31 +316,21 @@ public class SetupController {
         }
 
         OidcSetting oidcSetting = setupSessionData.getOidcSettings().get(0);
-        Map<String, Object> metadata = oidcProviderService.getMetadata(oidcSetting.getUri());
+        Map<String, Object> metadata = oidcProviderService.getMetadata(
+                oidcSetting.getUri());
         String tokenEndpoint = (String) metadata.get("token_endpoint");
         String redirectUri = (String) session.getAttribute("oidc_redirect_uri");
 
         JWTClaimsSet claims = oidcProviderService.exchangeCodeForClaims(
-                tokenEndpoint, code, oidcSetting.getClientId()
-                , oidcSetting.getClientSecret(), redirectUri);
+                tokenEndpoint,
+                code,
+                oidcSetting.getClientId(),
+                oidcSetting.getClientSecret(),
+                redirectUri);
 
         setupSessionData.setAdminIss(claims.getIssuer());
         setupSessionData.setAdminAud(oidcSetting.getClientId());
         setupSessionData.setAdminSub(claims.getSubject());
-
-        try {
-            setupSessionData.setAdminName(
-                    claims.getStringClaim("name") != null
-                            ? claims.getStringClaim("name")
-                            : claims.getSubject());
-            setupSessionData.setAdminEmail(
-                    claims.getStringClaim("email") != null
-                            ? claims.getStringClaim("email") : "");
-        } catch (java.text.ParseException e) {
-            log.warn("IDトークンのクレーム取得に失敗しました", e);
-            setupSessionData.setAdminName(claims.getSubject());
-            setupSessionData.setAdminEmail("");
-        }
 
         session.removeAttribute("oidc_state");
         session.removeAttribute("oidc_redirect_uri");

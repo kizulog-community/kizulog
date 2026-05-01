@@ -3,6 +3,7 @@ package io.github.kizulog_community.kizulog.domain.setup;
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -12,6 +13,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountStatus;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
 import io.github.kizulog_community.kizulog.domain.systemconfig.port.SystemConfigRepository;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.OidcSetting;
@@ -19,10 +26,9 @@ import io.github.kizulog_community.kizulog.infrastructure.web.setup.SetupSession
 import lombok.RequiredArgsConstructor;
 
 /**
- * システム設定サービス
+ * セットアップサービス
  *
- * <p>OIDC・言語・タイムゾーン等のシステム設定の保存・更新ユースケースを実装する。
- * セットアップウィザードおよびAPI経由での設定変更に対応する。</p>
+ * <p>OIDC・言語・タイムゾーン設定とシステム管理アカウント登録のユースケースを実装する。</p>
  *
  * @author Jun Kobayashi
  */
@@ -33,6 +39,15 @@ public class SetupService {
     /** システム設定リポジトリ */
     private final SystemConfigRepository systemConfigRepository;
 
+    /** システム管理アカウントリポジトリ */
+    private final SystemAccountRepository systemAccountRepository;
+
+    /** システム管理アカウントロールリポジトリ */
+    private final SystemAccountRoleRepository systemAccountRoleRepository;
+
+    /** システム管理アカウントステータスリポジトリ */
+    private final SystemAccountStatusRepository systemAccountStatusRepository;
+
     /** 暗号化ポート */
     private final CryptoPort cryptoPort;
 
@@ -40,33 +55,52 @@ public class SetupService {
     private final ObjectMapper objectMapper;
 
     /**
-     * セットアップ設定を一括保存する。
+     * セットアップ設定を一括保存する.
      *
-     * <p>OIDC・LANGUAGE・TIMEZONEを同一トランザクション・同一バージョンで保存する。</p>
+     * <p>同一トランザクション・同一バージョンで以下を保存する。</p>
+     * <ul>
+     *   <li>system_config（OIDC・言語・タイムゾーン）</li>
+     *   <li>system_accounts（初期管理者）</li>
+     *   <li>system_account_roles（SYSTEM_ADMIN）</li>
+     *   <li>system_account_status（ACTIVE）</li>
+     * </ul>
      *
      * @param sessionData セッションに保存されたセットアップデータ
-     * @throws RuntimeException JSON変換に失敗した場合
      */
     @Transactional
     public void save(SetupSessionData sessionData) {
         OffsetDateTime version = OffsetDateTime.now(ZoneOffset.UTC);
         String createdBy = "system:setup-wizard";
 
+        // システム設定保存
         systemConfigRepository.save(buildOidcConfig(sessionData, version, createdBy));
         systemConfigRepository.save(buildLanguageConfig(sessionData, version, createdBy));
         systemConfigRepository.save(buildTimezoneConfig(sessionData, version, createdBy));
+
+        // 初期管理者アカウント保存
+        String accountId = UUID.randomUUID().toString();
+
+        systemAccountRepository.save(new SystemAccount(
+                accountId, version, sessionData.getAdminIss(), sessionData.getAdminAud()
+                , sessionData.getAdminSub(), version, createdBy));
+
+        systemAccountRoleRepository.save(new SystemAccountRole(
+                accountId, "SYSTEM_ADMIN", version, version, createdBy));
+
+        systemAccountStatusRepository.save(new SystemAccountStatus(
+                accountId, version, "ACTIVE", null, version, createdBy));
     }
 
     /**
      * OIDC設定のSystemConfigを生成する。
      *
-     * @param sessionData セットアップセッションデータ
-     * @param version バージョン（保存日時）
+     * @param sessionData セッションデータ
+     * @param version バージョン
      * @param createdBy 作成者
-     * @return OIDC設定のSystemConfig
+     * @return OIDC設定
      */
-    private SystemConfig buildOidcConfig(SetupSessionData sessionData,
-            OffsetDateTime version, String createdBy) {
+    private SystemConfig buildOidcConfig(
+    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             List<OidcSetting> settings = sessionData.getOidcSettings().stream()
                     .map(s -> {
@@ -75,7 +109,7 @@ public class SetupService {
                         encrypted.setUri(s.getUri());
                         encrypted.setClientId(s.getClientId());
                         encrypted.setClientSecret(
-                        		cryptoPort.encrypt(s.getClientSecret()));
+                                cryptoPort.encrypt(s.getClientSecret()));
                         return encrypted;
                     })
                     .toList();
@@ -94,13 +128,13 @@ public class SetupService {
     /**
      * 言語設定のSystemConfigを生成する。
      *
-     * @param sessionData セットアップセッションデータ
-     * @param version バージョン（保存日時）
+     * @param sessionData セッションデータ
+     * @param version バージョン
      * @param createdBy 作成者
-     * @return 言語設定のSystemConfig
+     * @return 言語設定
      */
-    private SystemConfig buildLanguageConfig(SetupSessionData sessionData,
-            OffsetDateTime version, String createdBy) {
+    private SystemConfig buildLanguageConfig(
+    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultLanguage().getCode());
@@ -122,13 +156,13 @@ public class SetupService {
     /**
      * タイムゾーン設定のSystemConfigを生成する。
      *
-     * @param sessionData セットアップセッションデータ
-     * @param version バージョン（保存日時）
+     * @param sessionData セッションデータ
+     * @param version バージョン
      * @param createdBy 作成者
-     * @return タイムゾーン設定のSystemConfig
+     * @return タイムゾーン設定
      */
-    private SystemConfig buildTimezoneConfig(SetupSessionData sessionData,
-            OffsetDateTime version, String createdBy) {
+    private SystemConfig buildTimezoneConfig(
+    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultTimezone().getZoneId().getId());

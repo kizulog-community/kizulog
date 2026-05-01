@@ -23,7 +23,7 @@ public class JacksonConfig {
      * @return ObjectMapper
      */
     @Bean
-    public ObjectMapper objectMapper() {
+    ObjectMapper objectMapper() {
         ObjectMapper mapper = new ObjectMapper();
         mapper.registerModule(new JavaTimeModule());
         mapper.disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);

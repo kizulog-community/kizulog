@@ -26,7 +26,7 @@ public class LocaleConfig {
      * @return LocaleResolver
      */
 	@Bean
-	public SessionLocaleResolver localeResolver() {
+	SessionLocaleResolver localeResolver() {
 	    SessionLocaleResolver resolver = new SessionLocaleResolver();
 	    resolver.setDefaultLocale(Locale.JAPANESE);
 	    return resolver;

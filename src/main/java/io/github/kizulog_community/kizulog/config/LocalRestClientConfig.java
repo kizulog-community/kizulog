@@ -51,7 +51,7 @@ public class LocalRestClientConfig {
      * @throws Exception SSLContext構築に失敗した場合
      */
     @Bean
-    public RestClient restClient() throws Exception {
+    RestClient restClient() throws Exception {
         TrustManager[] trustAllCerts = new TrustManager[] {
             new X509TrustManager() {
                 @Override

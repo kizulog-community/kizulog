@@ -25,7 +25,7 @@ public class FilterConfig {
      * @return フィルター登録Bean
      */
     @Bean
-    public FilterRegistrationBean<SetupCheckFilter> setupCheckFilterRegistration() {
+    FilterRegistrationBean<SetupCheckFilter> setupCheckFilterRegistration() {
         SetupCheckFilter filter = new SetupCheckFilter(systemConfigService);
         FilterRegistrationBean<SetupCheckFilter> registration =
                 new FilterRegistrationBean<>(filter);

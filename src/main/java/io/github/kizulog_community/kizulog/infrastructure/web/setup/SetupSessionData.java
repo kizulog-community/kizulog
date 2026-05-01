@@ -3,6 +3,7 @@ package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;
 
@@ -25,7 +26,7 @@ import lombok.Setter;
 @Setter
 public class SetupSessionData implements Serializable {
 
-    private static final long serialVersionUID = 758730933041353765L;
+    private static final long serialVersionUID = 1L;
 
     /** セットアップ言語 */
     private SupportedLanguage setupLanguage;
@@ -44,7 +45,8 @@ public class SetupSessionData implements Serializable {
 
     /** 利用可能タイムゾーンリスト */
     private List<SupportedTimezone> availableTimezones = new ArrayList<>();
-    /** ホスト名（Step2で設定）. */
+
+    /** ホスト名（Step2で設定） */
     private String host;
 
     /** 初期管理者のiss */
@@ -56,10 +58,4 @@ public class SetupSessionData implements Serializable {
     /** 初期管理者のsub */
     private String adminSub;
 
-    /** 初期管理者の氏名 */
-    private String adminName;
-
-    /** 初期管理者のメールアドレス */
-    private String adminEmail;
-    
 }
