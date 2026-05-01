@@ -5,12 +5,12 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.security.autoconfigure.UserDetailsServiceAutoConfiguration;
 
 @SpringBootApplication(exclude = {
-	    UserDetailsServiceAutoConfiguration.class
-	})
+    UserDetailsServiceAutoConfiguration.class
+})
 public class KizulogApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(KizulogApplication.class, args);
-	}
+public static void main(String[] args) {
+SpringApplication.run(KizulogApplication.class, args);
+}
 
 }

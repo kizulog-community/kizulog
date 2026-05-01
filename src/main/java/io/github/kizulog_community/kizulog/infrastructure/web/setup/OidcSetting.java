@@ -15,7 +15,7 @@ public class OidcSetting implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-	/** OIDC識別子 */
+/** OIDC識別子 */
     private String id;
 
     /** URI */

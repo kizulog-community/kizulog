@@ -100,7 +100,7 @@ public class SetupService {
      * @return OIDC設定
      */
     private SystemConfig buildOidcConfig(
-    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             List<OidcSetting> settings = sessionData.getOidcSettings().stream()
                     .map(s -> {
@@ -134,7 +134,7 @@ public class SetupService {
      * @return 言語設定
      */
     private SystemConfig buildLanguageConfig(
-    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultLanguage().getCode());
@@ -162,7 +162,7 @@ public class SetupService {
      * @return タイムゾーン設定
      */
     private SystemConfig buildTimezoneConfig(
-    		SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultTimezone().getZoneId().getId());

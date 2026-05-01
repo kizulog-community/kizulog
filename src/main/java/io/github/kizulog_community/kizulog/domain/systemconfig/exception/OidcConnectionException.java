@@ -12,7 +12,7 @@ public class OidcConnectionException extends RuntimeException {
 
     private static final long serialVersionUID = 1L;
 
-	/** エラー種別. */
+/** エラー種別. */
     private final OidcConnectionError errorType;
 
     /**
@@ -32,7 +32,7 @@ public class OidcConnectionException extends RuntimeException {
      * @param cause 原因例外
      */
     public OidcConnectionException(
-    		OidcConnectionError errorType, Throwable cause) {
+    OidcConnectionError errorType, Throwable cause) {
         super(errorType.name(), cause);
         this.errorType = errorType;
     }

@@ -25,11 +25,11 @@ public class LocaleConfig {
      *
      * @return LocaleResolver
      */
-	@Bean
-	SessionLocaleResolver localeResolver() {
-	    SessionLocaleResolver resolver = new SessionLocaleResolver();
-	    resolver.setDefaultLocale(Locale.JAPANESE);
-	    return resolver;
-	}
+@Bean
+SessionLocaleResolver localeResolver() {
+    SessionLocaleResolver resolver = new SessionLocaleResolver();
+    resolver.setDefaultLocale(Locale.JAPANESE);
+    return resolver;
+}
 
 }

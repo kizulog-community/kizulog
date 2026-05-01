@@ -1,6 +1,7 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -48,7 +49,7 @@ public class SetupController {
     /** MessageSource */
     private final MessageSource messageSource;
 
-    /** LocaleResolve. */
+    /** LocaleResolve */
     private final SessionLocaleResolver localeResolver;
 
     /** セットアップサービス */
@@ -108,7 +109,19 @@ public class SetupController {
         }
         model.addAttribute("sessionData", setupSessionData);
         model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
-        model.addAttribute("timezones", Arrays.asList(SupportedTimezone.values()));
+
+        // タイムゾーン全件をList<Map>として渡す（Thymeleafが自動的にJSオブジェクトに変換）
+        List<Map<String, String>> tzList = SupportedTimezone.values().stream()
+                .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
+                .toList();
+        model.addAttribute("timezonesJson", tzList);
+
+        // 選択済みタイムゾーン
+        List<Map<String, String>> selectedTzList = setupSessionData.getAvailableTimezones().stream()
+                .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
+                .toList();
+        model.addAttribute("selectedTimezones", selectedTzList);
+
         return "setup/step1";
     }
 
@@ -120,7 +133,7 @@ public class SetupController {
      */
     @PostMapping("/step1")
     public String step1Submit(
-    		@ModelAttribute Step1FormData formData, RedirectAttributes redirectAttributes) {
+    @ModelAttribute Step1FormData formData, RedirectAttributes redirectAttributes) {
         if (formData.getAvailableLanguages() == null
                 || formData.getAvailableLanguages().isEmpty()) {
             redirectAttributes.addFlashAttribute("error", "validation.availableLanguages.empty");

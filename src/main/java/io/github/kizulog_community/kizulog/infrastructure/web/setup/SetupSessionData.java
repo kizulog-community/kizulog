@@ -31,7 +31,7 @@ public class SetupSessionData implements Serializable {
     /** セットアップ言語 */
     private SupportedLanguage setupLanguage;
 
-	/** OIDC設定リスト */
+/** OIDC設定リスト */
     private List<OidcSetting> oidcSettings = new ArrayList<>();
 
     /** デフォルト言語 */
