@@ -4,6 +4,8 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.MessageSource;
 import org.springframework.context.i18n.SimpleLocaleContext;
 import org.springframework.http.ResponseEntity;
@@ -18,6 +20,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
 
+import com.nimbusds.jwt.JWTClaimsSet;
+
 import io.github.kizulog_community.kizulog.domain.setup.SetupService;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
@@ -25,6 +29,7 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.exception.OidcCon
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -39,11 +44,11 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SetupController {
 
-	/** MessageSource */
-	private final MessageSource messageSource;
+    /** MessageSource */
+    private final MessageSource messageSource;
 
-	/** LocaleResolver */
-	private final SessionLocaleResolver localeResolver;
+    /** LocaleResolve. */
+    private final SessionLocaleResolver localeResolver;
 
     /** セットアップサービス */
     private final SetupService setupService;
@@ -54,8 +59,11 @@ public class SetupController {
     /** OIDCプロバイダーサービス */
     private final OidcProviderService oidcProviderService;
 
+    /** ロガー */
+    private static final Logger log = LoggerFactory.getLogger(SetupController.class);
+
     /**
-     * Step0：言語選択画面を表示する。
+     * Step0：言語選択画面を表示
      *
      * @param model モデル
      * @return Step0テンプレート
@@ -68,18 +76,17 @@ public class SetupController {
     }
 
     /**
-     * Step0：言語選択を受け取りStep1へ遷移する。
+     * Step0：言語選択を受け取りStep1へ遷移
      *
      * @param language 選択された言語
-     * @param request  HTTPリクエスト
+     * @param request HTTPリクエスト
      * @param response HTTPレスポンス
      * @return Step1へリダイレクト
      */
     @PostMapping("/step0")
     public String step0Submit(
             @RequestParam SupportedLanguage language,
-            HttpServletRequest request,
-            HttpServletResponse response) {
+            HttpServletRequest request, HttpServletResponse response) {
         setupSessionData.setSetupLanguage(language);
         localeResolver.setLocaleContext(
                 request, response,
@@ -88,7 +95,7 @@ public class SetupController {
     }
 
     /**
-     * Step1：OIDC設定画面を表示する。
+     * Step1：デフォルト設定画面を表示
      *
      * @param model モデル
      * @return Step1テンプレート
@@ -98,56 +105,62 @@ public class SetupController {
         if (setupSessionData.getSetupLanguage() == null) {
             return "redirect:/setup/step0";
         }
-        if (setupSessionData.getOidcSettings().isEmpty()) {
-            setupSessionData.getOidcSettings().add(new OidcSetting());
-        }
         model.addAttribute("sessionData", setupSessionData);
+        model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
+        model.addAttribute("timezones", Arrays.asList(SupportedTimezone.values()));
         return "setup/step1";
     }
 
     /**
-     * Step1：OIDC設定を受け取りStep2へ遷移する。
+     * Step1：デフォルト設定を受け取りStep2へ遷移
      *
-     * @param sessionData フォームデータ
+     * @param formData フォームデータ
      * @return Step2へリダイレクト
      */
     @PostMapping("/step1")
     public String step1Submit(@ModelAttribute Step1FormData formData) {
-        setupSessionData.setOidcSettings(formData.getOidcSettings());
-        return "redirect:/setup/step2";
-    }
-
-    /**
-     * Step2：基本設定画面を表示する。
-     *
-     * @param model モデル
-     * @return Step2テンプレート
-     */
-    @GetMapping("/step2")
-    public String step2(Model model) {
-        model.addAttribute("sessionData", setupSessionData);
-        model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
-        model.addAttribute("timezones", Arrays.asList(SupportedTimezone.values()));
-        return "setup/step2";
-    }
-
-    /**
-     * Step2：基本設定を受け取りStep3へ遷移する。
-     *
-     * @param sessionData フォームデータ
-     * @return Step3へリダイレクト
-     */
-    @PostMapping("/step2")
-    public String step2Submit(@ModelAttribute Step2FormData formData) {
         setupSessionData.setDefaultLanguage(formData.getDefaultLanguage());
         setupSessionData.setAvailableLanguages(formData.getAvailableLanguages());
         setupSessionData.setDefaultTimezone(formData.getDefaultTimezone());
         setupSessionData.setAvailableTimezones(formData.getAvailableTimezones());
+        return "redirect:/setup/step2";
+    }
+
+    /**
+     * Step2：システム管理OIDC設定画面を表示
+     *
+     * @param model モデル
+     * @param request HTTPリクエスト
+     * @return Step2テンプレート
+     */
+    @GetMapping("/step2")
+    public String step2(Model model, HttpServletRequest request) {
+        if (setupSessionData.getHost() == null) {
+            setupSessionData.setHost(request.getServerName());
+        }
+        if (setupSessionData.getOidcSettings().isEmpty()) {
+            setupSessionData.getOidcSettings().add(new OidcSetting());
+        }
+        model.addAttribute("sessionData", setupSessionData);
+        return "setup/step2";
+    }
+
+    /**
+     * Step2：OIDC設定を受け取りStep3へ遷移
+     *
+     * @param formData フォームデータ
+     * @return Step3へリダイレクト
+     */
+    @PostMapping("/step2")
+    public String step2Submit(@ModelAttribute Step2FormData formData) {
+        setupSessionData.setHost(formData.getHost());
+        setupSessionData.getOidcSettings().clear();
+        setupSessionData.getOidcSettings().add(formData.getOidcSetting());
         return "redirect:/setup/step3";
     }
 
     /**
-     * Step3：確認画面を表示する。
+     * Step3：管理者OIDCログイン画面を表示
      *
      * @param model モデル
      * @return Step3テンプレート
@@ -159,18 +172,30 @@ public class SetupController {
     }
 
     /**
-     * Step3：設定を保存して完了画面へ遷移する。
+     * Step4：確認画面を表示
+     *
+     * @param model モデル
+     * @return Step4テンプレート
+     */
+    @GetMapping("/step4")
+    public String step4(Model model) {
+        model.addAttribute("sessionData", setupSessionData);
+        return "setup/step4";
+    }
+
+    /**
+     * Step4：設定を保存して完了画面へ遷移
      *
      * @return 完了画面へリダイレクト
      */
-    @PostMapping("/step3")
-    public String step3Submit() {
+    @PostMapping("/step4")
+    public String step4Submit() {
         setupService.save(setupSessionData);
         return "redirect:/setup/complete";
     }
 
     /**
-     * 完了画面を表示する。
+     * 完了画面を表示
      *
      * @return 完了テンプレート
      */
@@ -183,30 +208,115 @@ public class SetupController {
      * OIDC接続確認
      *
      * @param request リクエストボディ（issuerUri）
-     * @param locale  ロケール
+     * @param locale ロケール
      * @return 接続確認結果
      */
     @PostMapping("/check-oidc")
     @ResponseBody
     public ResponseEntity<OidcCheckResult> checkOidc(
-    		@RequestBody Map<String, String> request, Locale locale) {
-    	try {
-    		oidcProviderService.verify(request.get("issuerUri"));
-    		return ResponseEntity.ok(new OidcCheckResult(
-    				true, null, messageSource.getMessage("oidc.success", null, locale)));
+            @RequestBody Map<String, String> request, Locale locale) {
+        try {
+            oidcProviderService.verify(request.get("issuerUri"));
+            return ResponseEntity.ok(new OidcCheckResult(
+                    true, null,
+                    messageSource.getMessage("oidc.success", null, locale)));
+        } catch (OidcConnectionException e) {
+            String messageKey = switch (e.getErrorType()) {
+                case INPUT_ERROR -> "oidc.error.input";
+                case CONNECTION_ERROR -> "oidc.error.connection";
+                case INVALID_RESPONSE -> "oidc.error.invalid_response";
+                case UNEXPECTED_ERROR -> "oidc.error.unexpected";
+            };
+            return ResponseEntity.ok(new OidcCheckResult(
+                    false, e.getErrorType().name(),
+                    messageSource.getMessage(messageKey, null, locale)));
+        }
+    }
 
-    	} catch (OidcConnectionException e) {
-    		String messageKey = switch (e.getErrorType()) {
-            	case INPUT_ERROR      -> "oidc.error.input";
-            	case CONNECTION_ERROR -> "oidc.error.connection";
-            	case INVALID_RESPONSE -> "oidc.error.invalid_response";
-            	case UNEXPECTED_ERROR -> "oidc.error.unexpected";
-    	};
-    	
-        return ResponseEntity.ok(new OidcCheckResult(
-        		false, e.getErrorType().name(),
-                messageSource.getMessage(messageKey, null, locale)));
-    	}
+    /**
+     * OIDCログイン
+     *
+     * <p>Step2で設定したOIDCプロバイダーの認証URLへリダイレクトする。</p>
+     *
+     * @param request HTTPリクエスト
+     * @param session HTTPセッション
+     * @return OIDCプロバイダーへリダイレクト
+     */
+    @GetMapping("/oidc-login")
+    public String oidcLogin(HttpServletRequest request, HttpSession session) {
+        OidcSetting oidcSetting = setupSessionData.getOidcSettings().get(0);
+        Map<String, Object> metadata = oidcProviderService.getMetadata(oidcSetting.getUri());
+
+        String authorizationEndpoint = (String) metadata.get("authorization_endpoint");
+        String state = oidcProviderService.generateState();
+        session.setAttribute("oidc_state", state);
+
+        String redirectUri = request.getScheme() + "://"
+                + request.getServerName()
+                + (request.getServerPort() != 80 && request.getServerPort() != 443
+                        ? ":" + request.getServerPort() : "")
+                + "/setup/callback";
+        session.setAttribute("oidc_redirect_uri", redirectUri);
+
+        String authUrl = oidcProviderService.buildAuthorizationUrl(
+                authorizationEndpoint, oidcSetting.getClientId()
+                , redirectUri, state);
+
+        return "redirect:" + authUrl;
+    }
+
+    /**
+     * OIDCコールバック
+     *
+     * <p>OIDCプロバイダーからの認可コードを受け取りIDトークンに交換する。</p>
+     *
+     * @param code 認可コード
+     * @param state stateパラメーター
+     * @param session HTTPセッション
+     * @return Step3へリダイレクト
+     */
+    @GetMapping("/callback")
+    public String oidcCallback(
+    		@RequestParam String code, @RequestParam String state
+    		, HttpSession session) {
+
+        String savedState = (String) session.getAttribute("oidc_state");
+        if (!state.equals(savedState)) {
+            log.warn("state不一致: expected={}, actual={}", savedState, state);
+            return "redirect:/setup/step3?error=state_mismatch";
+        }
+
+        OidcSetting oidcSetting = setupSessionData.getOidcSettings().get(0);
+        Map<String, Object> metadata = oidcProviderService.getMetadata(oidcSetting.getUri());
+        String tokenEndpoint = (String) metadata.get("token_endpoint");
+        String redirectUri = (String) session.getAttribute("oidc_redirect_uri");
+
+        JWTClaimsSet claims = oidcProviderService.exchangeCodeForClaims(
+                tokenEndpoint, code, oidcSetting.getClientId()
+                , oidcSetting.getClientSecret(), redirectUri);
+
+        setupSessionData.setAdminIss(claims.getIssuer());
+        setupSessionData.setAdminAud(oidcSetting.getClientId());
+        setupSessionData.setAdminSub(claims.getSubject());
+
+        try {
+            setupSessionData.setAdminName(
+                    claims.getStringClaim("name") != null
+                            ? claims.getStringClaim("name")
+                            : claims.getSubject());
+            setupSessionData.setAdminEmail(
+                    claims.getStringClaim("email") != null
+                            ? claims.getStringClaim("email") : "");
+        } catch (java.text.ParseException e) {
+            log.warn("IDトークンのクレーム取得に失敗しました", e);
+            setupSessionData.setAdminName(claims.getSubject());
+            setupSessionData.setAdminEmail("");
+        }
+
+        session.removeAttribute("oidc_state");
+        session.removeAttribute("oidc_redirect_uri");
+
+        return "redirect:/setup/step3";
     }
 
 }

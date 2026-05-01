@@ -10,8 +10,9 @@
         body { background-color: #f8f9fa; }
         .setup-card { max-width: 640px; margin: 60px auto; }
         .step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.875rem; }
-        .step.done { background-color: #198754; color: white; }
         .step.active { background-color: #0d6efd; color: white; }
+        .step.done { background-color: #198754; color: white; }
+        .step.todo { background-color: #dee2e6; color: #6c757d; }
         .step-line { flex: 1; height: 2px; background-color: #dee2e6; margin: 0 8px; }
     </style>
 </head>
@@ -29,7 +30,11 @@
         <div class="step-line"></div>
         <div class="step done"><i class="bi bi-check"></i></div>
         <div class="step-line"></div>
+        <div class="step done"><i class="bi bi-check"></i></div>
+        <div class="step-line"></div>
         <div class="step active">3</div>
+        <div class="step-line"></div>
+        <div class="step todo">4</div>
     </div>
 
     <div class="card shadow-sm">
@@ -37,72 +42,48 @@
             <h5 class="card-title mb-1" th:text="#{setup.step3.title}"></h5>
             <p class="text-muted small mb-4" th:text="#{setup.step3.description}"></p>
 
-            <h6 class="fw-semibold mb-2">
-                <i class="bi bi-key me-1"></i>
-                <span th:text="#{setup.step3.section.oidc}"></span>
-            </h6>
-            <div th:each="oidc : ${sessionData.oidcSettings}"
-                 class="border rounded p-3 mb-3 bg-light">
-                <div class="row g-2 small">
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.id}"></div>
-                    <div class="col-8" th:text="${oidc.id}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.uri}"></div>
-                    <div class="col-8 text-break" th:text="${oidc.uri}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.clientId}"></div>
-                    <div class="col-8" th:text="${oidc.clientId}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.clientSecret}"></div>
-                    <div class="col-8 text-muted" th:text="#{setup.step3.secret.mask}"></div>
+            <!-- ログイン済みの場合 -->
+            <div th:if="${sessionData.adminSub != null}" class="mb-4">
+                <div class="alert alert-success">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span th:text="#{setup.step3.loggedIn}"></span>
                 </div>
-            </div>
-
-            <h6 class="fw-semibold mb-2 mt-3">
-                <i class="bi bi-translate me-1"></i>
-                <span th:text="#{setup.step3.section.language}"></span>
-            </h6>
-            <div class="border rounded p-3 mb-3 bg-light small">
-                <div class="row g-2">
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.defaultLanguage}"></div>
-                    <div class="col-8" th:text="${sessionData.defaultLanguage?.displayName}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.availableLanguages}"></div>
-                    <div class="col-8">
-                        <span th:each="lang, stat : ${sessionData.availableLanguages}">
-                            <span th:text="${lang.displayName}"></span>
-                            <span th:if="${!stat.last}">、</span>
-                        </span>
+                <div class="border rounded p-3 bg-light small">
+                    <div class="row g-2">
+                        <div class="col-4 text-muted" th:text="#{setup.step3.label.name}"></div>
+                        <div class="col-8" th:text="${sessionData.adminName}"></div>
+                        <div class="col-4 text-muted" th:text="#{setup.step3.label.email}"></div>
+                        <div class="col-8" th:text="${sessionData.adminEmail}"></div>
                     </div>
                 </div>
             </div>
 
-            <h6 class="fw-semibold mb-2 mt-3">
-                <i class="bi bi-clock me-1"></i>
-                <span th:text="#{setup.step3.section.timezone}"></span>
-            </h6>
-            <div class="border rounded p-3 mb-4 bg-light small">
-                <div class="row g-2">
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.defaultTimezone}"></div>
-                    <div class="col-8" th:text="${sessionData.defaultTimezone?.displayName}"></div>
-                    <div class="col-4 text-muted" th:text="#{setup.step3.label.availableTimezones}"></div>
-                    <div class="col-8">
-                        <span th:each="tz, stat : ${sessionData.availableTimezones}">
-                            <span th:text="${tz.displayName}"></span>
-                            <span th:if="${!stat.last}">、</span>
-                        </span>
-                    </div>
+            <!-- 未ログインの場合 -->
+            <div th:if="${sessionData.adminSub == null}" class="mb-4">
+                <div class="alert alert-info">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <span th:text="#{setup.step3.description}"></span>
                 </div>
-            </div>
-
-            <form th:action="@{/setup/step3}" method="post">
-                <div class="d-flex justify-content-between">
-                    <a href="/setup/step2" class="btn btn-outline-secondary px-4">
-                        <i class="bi bi-arrow-left me-1"></i>
-                        <span th:text="#{setup.button.back}"></span>
+                <div class="text-center">
+                    <a th:href="@{/setup/oidc-login}" class="btn btn-primary px-4">
+                        <i class="bi bi-box-arrow-in-right me-2"></i>
+                        <span th:text="#{setup.step3.button.login}"></span>
                     </a>
-                    <button type="submit" class="btn btn-success px-4">
-                        <i class="bi bi-check-circle me-1"></i>
-                        <span th:text="#{setup.button.save}"></span>
-                    </button>
                 </div>
-            </form>
+            </div>
+
+            <div class="d-flex justify-content-between">
+                <a href="/setup/step2" class="btn btn-outline-secondary px-4">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    <span th:text="#{setup.button.back}"></span>
+                </a>
+                <a th:href="@{/setup/step4}"
+                   class="btn btn-primary px-4"
+                   th:classappend="${sessionData.adminSub == null} ? 'disabled' : ''">
+                    <span th:text="#{setup.button.next}"></span>
+                    <i class="bi bi-arrow-right ms-1"></i>
+                </a>
+            </div>
         </div>
     </div>
 </div>

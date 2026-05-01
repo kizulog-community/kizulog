@@ -44,5 +44,22 @@ public class SetupSessionData implements Serializable {
 
     /** 利用可能タイムゾーンリスト */
     private List<SupportedTimezone> availableTimezones = new ArrayList<>();
+    /** ホスト名（Step2で設定）. */
+    private String host;
 
+    /** 初期管理者のiss */
+    private String adminIss;
+
+    /** 初期管理者のaud */
+    private String adminAud;
+
+    /** 初期管理者のsub */
+    private String adminSub;
+
+    /** 初期管理者の氏名 */
+    private String adminName;
+
+    /** 初期管理者のメールアドレス */
+    private String adminEmail;
+    
 }
