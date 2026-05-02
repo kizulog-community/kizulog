@@ -1,53 +1,52 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
-<modelVersion>4.0.0</modelVersion>
-<parent>
-<groupId>org.springframework.boot</groupId>
-<artifactId>spring-boot-starter-parent</artifactId>
-<version>4.0.6</version>
-<relativePath/> <!-- lookup parent from repository -->
-</parent>
-<groupId>io.github.kizulog-community</groupId>
-<artifactId>kizulog</artifactId>
-<version>1.000001.1-SNAPSHOT</version>
-<name/>
-<description/>
-<url/>
-<licenses>
-<license/>
-</licenses>
-<developers>
-<developer/>
-</developers>
-<scm>
-<connection/>
-<developerConnection/>
-<tag/>
-<url/>
-</scm>
-<properties>
-<java.version>25</java.version>
-</properties>
-
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>4.0.6</version>
+        <relativePath/>
+        <!--lookup parent from repository-->
+    </parent>
+    <groupId>io.github.kizulog-community</groupId>
+    <artifactId>kizulog</artifactId>
+    <version>1.000001.1-SNAPSHOT</version>
+    <name/>
+    <description/>
+    <url/>
+    <licenses>
+        <license/>
+    </licenses>
+    <developers>
+        <developer/>
+    </developers>
+    <scm>
+        <connection/>
+        <developerConnection/>
+        <tag/>
+        <url/>
+    </scm>
+    <properties>
+        <java.version>25</java.version>
+    </properties>
     <dependencies>
-        <!-- Spring Web（REST API） -->
+        <!--Spring Web（REST API）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
-        <!-- Spring Data JPA（DBアクセス） -->
+        <!--Spring Data JPA（DBアクセス）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-data-jpa</artifactId>
         </dependency>
-        <!-- PostgreSQL Driver -->
+        <!--PostgreSQL Driver-->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
-        <!-- Flyway（DBマイグレーション） -->
+        <!--Flyway（DBマイグレーション）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-flyway</artifactId>
@@ -56,51 +55,51 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
             <groupId>org.flywaydb</groupId>
             <artifactId>flyway-database-postgresql</artifactId>
         </dependency>
-        <!-- Spring Security -->
+        <!--Spring Security-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
-        <!-- Thymeleaf（セットアップウィザード画面） -->
+        <!--Thymeleaf（セットアップウィザード画面）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-thymeleaf</artifactId>
         </dependency>
-        <!-- Validation（入力バリデーション） -->
+        <!--Validation（入力バリデーション）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-validation</artifactId>
         </dependency>
-        <!-- Spring Security OAuth2 Client -->
+        <!--Spring Security OAuth2 Client-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
-        <!-- JWT -->
+        <!--JWT-->
         <dependency>
             <groupId>com.nimbusds</groupId>
             <artifactId>nimbus-jose-jwt</artifactId>
             <version>10.4</version>
         </dependency>
-        <!-- Jackson Java8日時型サポート -->
+        <!--Jackson Java8日時型サポート-->
         <dependency>
             <groupId>com.fasterxml.jackson.datatype</groupId>
             <artifactId>jackson-datatype-jsr310</artifactId>
         </dependency>
-        <!-- Lombok（ボイラープレート削減） -->
+        <!--Lombok（ボイラープレート削減）-->
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
             <optional>true</optional>
         </dependency>
-        <!-- Spring Boot DevTools（ホットリロード） -->
+        <!--Spring Boot DevTools（ホットリロード）-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
-        <!-- テスト -->
+        <!--テスト-->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
@@ -127,7 +126,6 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
             <scope>test</scope>
         </dependency>
     </dependencies>
-
     <build>
         <plugins>
             <plugin>
@@ -154,11 +152,12 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <!-- 単体テスト（mvn test）：*Test.java -->
+            <!--単体テスト（mvn test）：*Test.java-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-surefire-plugin</artifactId>
                 <configuration>
+                    <argLine>${surefireArgLine}</argLine>
                     <includes>
                         <include>**/*Test.java</include>
                     </includes>
@@ -167,8 +166,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                     </excludes>
                 </configuration>
             </plugin>
-            
-            <!-- 統合テスト（mvn verify）：*IT.java -->
+            <!--統合テスト（mvn verify）：*IT.java-->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
@@ -181,19 +179,19 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                     </execution>
                 </executions>
                 <configuration>
+                    <argLine>${failsafeArgLine}</argLine>
                     <includes>
                         <include>**/*IT.java</include>
                     </includes>
                 </configuration>
             </plugin>
-            
-            <!-- カバレッジ計測 -->
+            <!--カバレッジ計測-->
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
-                <version>0.8.12</version>
+                <version>0.8.14</version>
                 <executions>
-                    <!-- 単体テスト用 -->
+                    <!--単体テスト用-->
                     <execution>
                         <id>prepare-agent-unit</id>
                         <goals>
@@ -215,7 +213,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                             <outputDirectory>${project.build.directory}/site/jacoco-unit</outputDirectory>
                         </configuration>
                     </execution>
-                    <!-- 統合テスト用 -->
+                    <!--統合テスト用-->
                     <execution>
                         <id>prepare-agent-integration</id>
                         <goals>
@@ -237,7 +235,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                             <outputDirectory>${project.build.directory}/site/jacoco-it</outputDirectory>
                         </configuration>
                     </execution>
-                    <!-- 全テストの統合レポート -->
+                    <!--全テストの統合レポート-->
                     <execution>
                         <id>merge</id>
                         <phase>verify</phase>
@@ -271,7 +269,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
                 </executions>
                 <configuration>
                     <excludes>
-                        <!-- Lombokの生成コード・JPA Entity・DTO・Configを除外 -->
+                        <!--Lombokの生成コード・JPA Entity・DTO・Configを除外-->
                         <exclude>**/entity/**</exclude>
                         <exclude>**/dto/**</exclude>
                         <exclude>**/config/**</exclude>
@@ -287,5 +285,4 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
             </plugin>
         </plugins>
     </build>
-
 </project>
