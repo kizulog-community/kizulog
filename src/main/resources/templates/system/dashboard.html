@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.dashboard.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <!-- ヘッダ -->
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <!-- サイドバー -->
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='dashboard')}"></aside>
+
+            <!-- メインコンテンツ -->
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- ============================================================ -->
+                <!-- ページヘッダ                                                  -->
+                <!-- ============================================================ -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-speedometer2 me-2"></i>
+                        <span th:text="#{system.dashboard.title}">ダッシュボード</span>
+                    </h1>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- ログアウト直後のフラッシュメッセージ                          -->
+                <!-- (ログイン画面でlogout=trueの時に表示する用、ここでは表示なし) -->
+                <!-- ============================================================ -->
+
+                <!-- ============================================================ -->
+                <!-- ウェルカムカード                                              -->
+                <!-- ============================================================ -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-emoji-smile me-2 text-primary"></i>
+                            <span th:text="#{system.dashboard.welcome.title}">ようこそ</span>
+                        </h5>
+                        <p class="card-text text-muted mb-0" th:text="#{system.dashboard.welcome.description}">
+                            KizuLogのシステム管理画面です。左のメニューから操作を選択してください。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- ログインアカウント情報カード                                  -->
+                <!-- ============================================================ -->
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <h5 class="card-title">
+                            <i class="bi bi-person-badge me-2 text-primary"></i>
+                            <span th:text="#{system.dashboard.account.title}">ログインアカウント情報</span>
+                        </h5>
+                        <dl class="row mb-0 small">
+                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.iss}">Issuer</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${principal != null ? principal.iss : ''}">-</code>
+                            </dd>
+                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.aud}">Audience</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${principal != null ? principal.aud : ''}">-</code>
+                            </dd>
+                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.sub}">Subject</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${principal != null ? principal.sub : ''}">-</code>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- クイックリンク（管理機能カード）                              -->
+                <!-- ============================================================ -->
+                <h5 class="mb-3" th:text="#{system.dashboard.quicklinks.title}">管理機能</h5>
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <a th:href="@{/system/tenants}" class="text-decoration-none">
+                            <div class="card h-100 quicklink-card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary">
+                                        <i class="bi bi-buildings me-2"></i>
+                                        <span th:text="#{system.menu.tenants}">テナント管理</span>
+                                    </h6>
+                                    <p class="card-text small text-muted mb-0"
+                                       th:text="#{system.dashboard.quicklinks.tenants.description}">
+                                        テナントの登録・編集・無効化を行います。
+                                    </p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a th:href="@{/system/system-settings}" class="text-decoration-none">
+                            <div class="card h-100 quicklink-card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary">
+                                        <i class="bi bi-gear me-2"></i>
+                                        <span th:text="#{system.menu.systemSettings}">システム管理</span>
+                                    </h6>
+                                    <p class="card-text small text-muted mb-0"
+                                       th:text="#{system.dashboard.quicklinks.systemSettings.description}">
+                                        言語・タイムゾーン等のシステム設定を管理します。
+                                    </p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                    <div class="col-md-4">
+                        <a th:href="@{/system/accounts}" class="text-decoration-none">
+                            <div class="card h-100 quicklink-card">
+                                <div class="card-body">
+                                    <h6 class="card-title text-primary">
+                                        <i class="bi bi-people me-2"></i>
+                                        <span th:text="#{system.menu.accounts}">アカウント管理</span>
+                                    </h6>
+                                    <p class="card-text small text-muted mb-0"
+                                       th:text="#{system.dashboard.quicklinks.accounts.description}">
+                                        システム管理者アカウントの管理・招待を行います。
+                                    </p>
+                                </div>
+                            </div>
+                        </a>
+                    </div>
+                </div>
+
+                <style>
+                    .quicklink-card {
+                        transition: all 0.2s;
+                        border: 1px solid #dee2e6;
+                    }
+                    .quicklink-card:hover {
+                        border-color: #0d6efd;
+                        box-shadow: 0 4px 8px rgba(13, 110, 253, 0.1);
+                        transform: translateY(-2px);
+                    }
+                </style>
+
+            </main>
+
+        </div>
+    </div>
+
+    <!-- 共通scripts -->
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>
