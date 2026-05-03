@@ -22,7 +22,7 @@ public class SystemAccountStatus {
     private final OffsetDateTime version;
 
     /** ステータス（ACTIVE / INACTIVE / SUSPENDED） */
-    private final String status;
+    private final AccountStatus status;
 
     /** 変更理由（任意） */
     private final String reason;

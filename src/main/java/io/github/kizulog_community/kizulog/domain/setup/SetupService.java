@@ -13,9 +13,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRole;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountStatus;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemRole;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
@@ -55,7 +57,7 @@ public class SetupService {
     private final ObjectMapper objectMapper;
 
     /**
-     * セットアップ設定を一括保存する.
+     * セットアップ設定を一括保存する。
      *
      * <p>同一トランザクション・同一バージョンで以下を保存する。</p>
      * <ul>
@@ -85,10 +87,10 @@ public class SetupService {
                 , sessionData.getAdminSub(), version, createdBy));
 
         systemAccountRoleRepository.save(new SystemAccountRole(
-                accountId, "SYSTEM_ADMIN", version, version, createdBy));
+                accountId, SystemRole.SYSTEM_ADMIN, version, version, createdBy));
 
         systemAccountStatusRepository.save(new SystemAccountStatus(
-                accountId, version, "ACTIVE", null, version, createdBy));
+                accountId, version, AccountStatus.ACTIVE, null, version, createdBy));
     }
 
     /**

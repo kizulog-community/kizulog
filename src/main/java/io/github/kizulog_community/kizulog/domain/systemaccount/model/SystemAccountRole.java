@@ -19,8 +19,8 @@ public class SystemAccountRole {
     /** アカウントID */
     private final String accountId;
 
-    /** ロール（SYSTEM_ADMIN） */
-    private final String role;
+    /** ロール */
+    private final SystemRole role;
 
     /** バージョン */
     private final OffsetDateTime version;

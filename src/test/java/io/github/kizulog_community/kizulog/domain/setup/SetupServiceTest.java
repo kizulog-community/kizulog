@@ -21,9 +21,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRole;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountStatus;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemRole;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
@@ -183,7 +185,7 @@ class SetupServiceTest {
         verify(systemAccountRoleRepository).save(captor.capture());
 
         SystemAccountRole role = captor.getValue();
-        assertThat(role.getRole()).isEqualTo("SYSTEM_ADMIN");
+        assertThat(role.getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
         assertThat(role.getCreatedBy()).isEqualTo("system:setup-wizard");
     }
 
@@ -198,7 +200,7 @@ class SetupServiceTest {
         verify(systemAccountStatusRepository).save(captor.capture());
 
         SystemAccountStatus status = captor.getValue();
-        assertThat(status.getStatus()).isEqualTo("ACTIVE");
+        assertThat(status.getStatus()).isEqualTo(AccountStatus.ACTIVE);
         assertThat(status.getReason()).isNull();
         assertThat(status.getCreatedBy()).isEqualTo("system:setup-wizard");
     }

@@ -1,0 +1,10 @@
+{
+  "properties": [
+    {
+      "name": "kizulog.crypto.secret-key",
+      "type": "java.lang.String",
+      "description": "AES暗号化に使用する32バイトの秘密鍵。OIDCクライアントシークレット等の機密情報の暗号化/復号で使用される。本番環境では環境変数CRYPTO_SECRET_KEYから注入し、絶対にリポジトリにコミットしないこと。",
+      "sourceType": "io.github.kizulog_community.kizulog.infrastructure.crypto.CryptoService"
+    }
+  ]
+}
