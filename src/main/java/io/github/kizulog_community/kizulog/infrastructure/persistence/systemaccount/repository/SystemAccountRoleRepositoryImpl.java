@@ -11,10 +11,7 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
 import lombok.RequiredArgsConstructor;
 
 /**
- * システム管理アカウントロールリポジトリ実装クラス（アダプター）
- *
- * <p>ドメイン層のOutput Port（SystemAccountRoleRepository）の実装クラス。
- * Spring Data JPAを使用してPostgreSQLへのアクセスを提供する。</p>
+ * システム管理アカウントロールリポジトリ実装
  *
  * @author Jun Kobayashi
  */
@@ -22,12 +19,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SystemAccountRoleRepositoryImpl implements SystemAccountRoleRepository {
 
-    /** JPAリポジトリ */
     private final SystemAccountRoleJpaRepository jpaRepository;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public List<SystemAccountRole> findLatestByAccountId(String accountId) {
         return jpaRepository.findLatestByAccountId(accountId).stream()
@@ -35,46 +28,28 @@ public class SystemAccountRoleRepositoryImpl implements SystemAccountRoleReposit
                 .toList();
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void save(SystemAccountRole systemAccountRole) {
         jpaRepository.save(toEntity(systemAccountRole));
     }
 
-    /**
-     * Entityをドメインモデルにマップする。
-     *
-     * @param entity Entity
-     * @return ドメインモデル
-     */
     private SystemAccountRole toDomain(SystemAccountRoleEntity entity) {
         return new SystemAccountRole(
-                entity.getId().getAccountId(),
-                entity.getId().getRole(),
+                entity.getId().getRoleId(),
                 entity.getId().getVersion(),
+                entity.getAccountId(),
+                entity.getRole(),
                 entity.getCreatedAt(),
-                entity.getCreatedBy()
-        );
+                entity.getCreatedBy());
     }
 
-    /**
-     * ドメインモデルをEntityにマップする。
-     *
-     * @param systemAccountRole ドメインモデル
-     * @return Entity
-     */
-    private SystemAccountRoleEntity toEntity(SystemAccountRole systemAccountRole) {
+    private SystemAccountRoleEntity toEntity(SystemAccountRole domain) {
         return new SystemAccountRoleEntity(
-                new SystemAccountRoleId(
-                        systemAccountRole.getAccountId(),
-                        systemAccountRole.getRole(),
-                        systemAccountRole.getVersion()
-                ),
-                systemAccountRole.getCreatedAt(),
-                systemAccountRole.getCreatedBy()
-        );
+                new SystemAccountRoleId(domain.getRoleId(), domain.getVersion()),
+                domain.getAccountId(),
+                domain.getRole(),
+                domain.getCreatedAt(),
+                domain.getCreatedBy());
     }
 
 }

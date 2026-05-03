@@ -1,6 +1,7 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity;
 
 import java.time.OffsetDateTime;
+
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -10,6 +11,10 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
+ * システム管理アカウントEntity
+ *
+ * <p>system_accountsテーブルにマップする。</p>
+ *
  * @author Jun Kobayashi
  */
 @Entity
@@ -21,15 +26,6 @@ public class SystemAccountEntity {
 
     @EmbeddedId
     private SystemAccountId id;
-
-    @Column(name = "iss", nullable = false)
-    private String iss;
-
-    @Column(name = "aud", nullable = false)
-    private String aud;
-
-    @Column(name = "sub", nullable = false)
-    private String sub;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

@@ -11,7 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * システム管理アカウントロールの主キー
+ * システム管理アカウント認証方法の主キー
  *
  * @author Jun Kobayashi
  */
@@ -20,12 +20,12 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-public class SystemAccountRoleId implements Serializable {
+public class SystemAccountIdentityId implements Serializable {
 
     private static final long serialVersionUID = 1L;
 
-    @Column(name = "role_id", nullable = false)
-    private String roleId;
+    @Column(name = "identity_id", nullable = false)
+    private String identityId;
 
     @Column(name = "version", nullable = false)
     private OffsetDateTime version;

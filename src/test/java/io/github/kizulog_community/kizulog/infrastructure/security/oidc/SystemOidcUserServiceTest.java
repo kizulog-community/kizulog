@@ -22,7 +22,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
-import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationErrorType;
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationException;
 import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemAuthenticationService;
@@ -39,6 +39,7 @@ class SystemOidcUserServiceTest {
     private static final String AUD = "kizulog-master";
     private static final String SUB = "user-uuid-123";
     private static final String ACCOUNT_ID = "acc-1";
+    private static final String IDENTITY_ID = "identity-1";
     private static final OffsetDateTime VERSION =
             OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
@@ -99,25 +100,26 @@ class SystemOidcUserServiceTest {
         return oidcUser;
     }
 
-    private SystemAccount account() {
-        return new SystemAccount(ACCOUNT_ID, VERSION, ISS, AUD, SUB, VERSION, "system:setup");
+    private SystemAccountIdentity identity() {
+        return new SystemAccountIdentity(
+                IDENTITY_ID, VERSION, ACCOUNT_ID, ISS, AUD, SUB,
+                VERSION, "system:setup");
     }
 
     @Test
-    @DisplayName("loadUser: 認証成功時、SystemUserPrincipalが返る（accountId/iss/aud/sub/principal型）")
+    @DisplayName("loadUser: 認証成功時、SystemUserPrincipalが返る（accountId/identityId/iss/aud/sub）")
     void loadUser_succeeds_returnsSystemUserPrincipal() {
-        // モック構築は事前に変数化（when().thenReturn()内で別のwhen()を呼ぶと
-        // UnfinishedStubbingExceptionになるため）
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
         when(delegate.loadUser(any())).thenReturn(oidcUser);
-        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(account());
+        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(identity());
 
         OidcUser result = sut.loadUser(userRequest);
 
         assertThat(result).isInstanceOf(SystemUserPrincipal.class);
         SystemUserPrincipal principal = (SystemUserPrincipal) result;
         assertThat(principal.getAccountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(principal.getIdentityId()).isEqualTo(IDENTITY_ID);
         assertThat(principal.getIss()).isEqualTo(ISS);
         assertThat(principal.getAud()).isEqualTo(AUD);
         assertThat(principal.getSub()).isEqualTo(SUB);
@@ -129,7 +131,7 @@ class SystemOidcUserServiceTest {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
         when(delegate.loadUser(any())).thenReturn(oidcUser);
-        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(account());
+        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(identity());
 
         OidcUser result = sut.loadUser(userRequest);
 
@@ -144,7 +146,7 @@ class SystemOidcUserServiceTest {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
         when(delegate.loadUser(any())).thenReturn(oidcUser);
-        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(account());
+        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(identity());
 
         sut.loadUser(userRequest);
 
@@ -165,6 +167,22 @@ class SystemOidcUserServiceTest {
                 .isInstanceOf(OAuth2AuthenticationException.class)
                 .extracting("error.errorCode")
                 .isEqualTo("ACCOUNT_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("loadUser: IDENTITY_INACTIVE時、OAuth2AuthenticationExceptionに変換")
+    void loadUser_throwsOAuth2AuthException_whenIdentityInactive() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(authService.authenticate(ISS, AUD, SUB))
+                .thenThrow(new SystemAuthenticationException(
+                        SystemAuthenticationErrorType.IDENTITY_INACTIVE));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo("IDENTITY_INACTIVE");
     }
 
     @Test

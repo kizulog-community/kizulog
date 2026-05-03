@@ -1,6 +1,7 @@
 package io.github.kizulog_community.kizulog.domain.systemauth.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -18,6 +19,12 @@ class SystemAuthenticationErrorTypeTest {
     }
 
     @Test
+    @DisplayName("IDENTITY_INACTIVEが定義されている")
+    void values_containsIdentityInactive() {
+        assertThat(SystemAuthenticationErrorType.IDENTITY_INACTIVE).isNotNull();
+    }
+
+    @Test
     @DisplayName("ACCOUNT_INACTIVEが定義されている")
     void values_containsAccountInactive() {
         assertThat(SystemAuthenticationErrorType.ACCOUNT_INACTIVE).isNotNull();
@@ -30,9 +37,9 @@ class SystemAuthenticationErrorTypeTest {
     }
 
     @Test
-    @DisplayName("values()は3件の要素を返す")
-    void values_returnsThreeElements() {
-        assertThat(SystemAuthenticationErrorType.values()).hasSize(3);
+    @DisplayName("values()は4件の要素を返す")
+    void values_returnsFourElements() {
+        assertThat(SystemAuthenticationErrorType.values()).hasSize(4);
     }
 
     @Test
@@ -40,6 +47,13 @@ class SystemAuthenticationErrorTypeTest {
     void valueOf_accountNotFound() {
         assertThat(SystemAuthenticationErrorType.valueOf("ACCOUNT_NOT_FOUND"))
                 .isEqualTo(SystemAuthenticationErrorType.ACCOUNT_NOT_FOUND);
+    }
+
+    @Test
+    @DisplayName("valueOf('IDENTITY_INACTIVE')でIDENTITY_INACTIVEを取得できる")
+    void valueOf_identityInactive() {
+        assertThat(SystemAuthenticationErrorType.valueOf("IDENTITY_INACTIVE"))
+                .isEqualTo(SystemAuthenticationErrorType.IDENTITY_INACTIVE);
     }
 
 }

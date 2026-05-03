@@ -12,19 +12,18 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAcco
 public interface SystemAccountRoleRepository {
 
     /**
-     * accountIdで最新バージョンのロール一覧を取得する。
+     * accountIdに紐付く全ロールの最新バージョンを取得する。
      *
-     * <p>同一accountIdに紐づくレコードの中で、{@code (account_id, role)}の
-     * 組み合わせごとに最新versionのレコードを返す。
-     * 1つのアカウントに複数のロールが付与されている場合、すべて返却される。</p>
+     * <p>1アカウントに複数ロールがある場合、各role_id毎の最新を返す。
+     * ロールが ACTIVE か INACTIVE かはここでは判定しない（呼び出し側で判定する）</p>
      *
      * @param accountId アカウントID
-     * @return 最新バージョンのロール一覧。該当なしの場合は空リスト
+     * @return ロールのリスト（空の場合あり）
      */
     List<SystemAccountRole> findLatestByAccountId(String accountId);
 
     /**
-     * システム管理アカウントロールを保存する。
+     * ロールを保存する。
      *
      * @param systemAccountRole 保存するロール
      */

@@ -15,11 +15,17 @@ import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentityStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRoleStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
 import io.github.kizulog_community.kizulog.domain.systemconfig.port.SystemConfigRepository;
@@ -38,17 +44,29 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SetupService {
 
+    /** セットアップ作成者識別子 */
+    private static final String CREATED_BY = "system:setup-wizard";
+
     /** システム設定リポジトリ */
     private final SystemConfigRepository systemConfigRepository;
 
     /** システム管理アカウントリポジトリ */
     private final SystemAccountRepository systemAccountRepository;
 
+    /** システム管理アカウントステータスリポジトリ */
+    private final SystemAccountStatusRepository systemAccountStatusRepository;
+
+    /** システム管理アカウント認証方法リポジトリ */
+    private final SystemAccountIdentityRepository systemAccountIdentityRepository;
+
+    /** システム管理アカウント認証方法ステータスリポジトリ */
+    private final SystemAccountIdentityStatusRepository systemAccountIdentityStatusRepository;
+
     /** システム管理アカウントロールリポジトリ */
     private final SystemAccountRoleRepository systemAccountRoleRepository;
 
-    /** システム管理アカウントステータスリポジトリ */
-    private final SystemAccountStatusRepository systemAccountStatusRepository;
+    /** システム管理アカウントロールステータスリポジトリ */
+    private final SystemAccountRoleStatusRepository systemAccountRoleStatusRepository;
 
     /** 暗号化ポート */
     private final CryptoPort cryptoPort;
@@ -60,37 +78,60 @@ public class SetupService {
      * セットアップ設定を一括保存する。
      *
      * <p>同一トランザクション・同一バージョンで以下を保存する。</p>
-     * <ul>
+     * <ol>
      *   <li>system_config（OIDC・言語・タイムゾーン）</li>
-     *   <li>system_accounts（初期管理者）</li>
-     *   <li>system_account_roles（SYSTEM_ADMIN）</li>
+     *   <li>system_accounts（初期管理者本体）</li>
      *   <li>system_account_status（ACTIVE）</li>
-     * </ul>
+     *   <li>system_account_identities（OIDC接続情報）</li>
+     *   <li>system_account_identity_status（ACTIVE）</li>
+     *   <li>system_account_roles（SYSTEM_ADMIN）</li>
+     *   <li>system_account_role_status（ACTIVE）</li>
+     * </ol>
      *
      * @param sessionData セッションに保存されたセットアップデータ
      */
     @Transactional
     public void save(SetupSessionData sessionData) {
         OffsetDateTime version = OffsetDateTime.now(ZoneOffset.UTC);
-        String createdBy = "system:setup-wizard";
 
-        // システム設定保存
-        systemConfigRepository.save(buildOidcConfig(sessionData, version, createdBy));
-        systemConfigRepository.save(buildLanguageConfig(sessionData, version, createdBy));
-        systemConfigRepository.save(buildTimezoneConfig(sessionData, version, createdBy));
+        // 1〜3. システム設定保存
+        systemConfigRepository.save(buildOidcConfig(sessionData, version, CREATED_BY));
+        systemConfigRepository.save(buildLanguageConfig(sessionData, version, CREATED_BY));
+        systemConfigRepository.save(buildTimezoneConfig(sessionData, version, CREATED_BY));
 
-        // 初期管理者アカウント保存
+        // ID採番
         String accountId = UUID.randomUUID().toString();
+        String identityId = UUID.randomUUID().toString();
+        String roleId = UUID.randomUUID().toString();
 
+        // 4. アカウント本体
         systemAccountRepository.save(new SystemAccount(
-                accountId, version, sessionData.getAdminIss(), sessionData.getAdminAud()
-                , sessionData.getAdminSub(), version, createdBy));
+                accountId, version, version, CREATED_BY));
 
-        systemAccountRoleRepository.save(new SystemAccountRole(
-                accountId, SystemRole.SYSTEM_ADMIN, version, version, createdBy));
-
+        // 5. アカウントステータス
         systemAccountStatusRepository.save(new SystemAccountStatus(
-                accountId, version, AccountStatus.ACTIVE, null, version, createdBy));
+                accountId, version, AccountStatus.ACTIVE, null, version, CREATED_BY));
+
+        // 6. 認証手段（identity）
+        systemAccountIdentityRepository.save(new SystemAccountIdentity(
+                identityId, version, accountId,
+                sessionData.getAdminIss(),
+                sessionData.getAdminAud(),
+                sessionData.getAdminSub(),
+                version, CREATED_BY));
+
+        // 7. 認証手段ステータス
+        systemAccountIdentityStatusRepository.save(new SystemAccountIdentityStatus(
+                identityId, version, AccountStatus.ACTIVE, null, version, CREATED_BY));
+
+        // 8. ロール
+        systemAccountRoleRepository.save(new SystemAccountRole(
+                roleId, version, accountId, SystemRole.SYSTEM_ADMIN,
+                version, CREATED_BY));
+
+        // 9. ロールステータス
+        systemAccountRoleStatusRepository.save(new SystemAccountRoleStatus(
+                roleId, version, AccountStatus.ACTIVE, null, version, CREATED_BY));
     }
 
     /**
@@ -102,7 +143,7 @@ public class SetupService {
      * @return OIDC設定
      */
     private SystemConfig buildOidcConfig(
-    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+            SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             List<OidcSetting> settings = sessionData.getOidcSettings().stream()
                     .map(s -> {
@@ -136,7 +177,7 @@ public class SetupService {
      * @return 言語設定
      */
     private SystemConfig buildLanguageConfig(
-    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+            SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultLanguage().getCode());
@@ -164,7 +205,7 @@ public class SetupService {
      * @return タイムゾーン設定
      */
     private SystemConfig buildTimezoneConfig(
-    SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
+            SetupSessionData sessionData, OffsetDateTime version, String createdBy) {
         try {
             var value = new java.util.LinkedHashMap<String, Object>();
             value.put("DEFAULT", sessionData.getDefaultTimezone().getZoneId().getId());

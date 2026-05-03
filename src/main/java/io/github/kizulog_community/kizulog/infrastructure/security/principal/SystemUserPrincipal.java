@@ -20,14 +20,16 @@ import lombok.Getter;
  *
  * <p>認証済みのシステム管理者を表すPrincipal。
  * Spring SecurityのOidcUserを実装することで、
- * Controllerの引数で{@code @AuthenticationPrincipal}を用いて受け取ることができる。</p>
+ * Controllerの引数でAuthenticationPrincipalを用いて受け取ることができる。</p>
  *
- * <p>不変オブジェクトとして設計しており、各フィールドはコンストラクタで
- * 確定したのち変更されない。継承による情報改ざんを防ぐためfinalクラスとする。</p>
+ * <p>不変オブジェクトとして設計しており、各フィールドはコンストラクタで確定したのち変更されない。
+ * 継承による情報改ざんを防ぐためfinalクラスとする。</p>
  *
- * <p>iss/aud/subのフィールド名はOIDC仕様の用語およびSystemAccountモデルと統一している。
+ * <p>iss/aud/subのフィールド名はOIDC仕様の用語およびSystemAccountIdentityモデルと統一している。
  * OidcUserインタフェース由来のgetIssuer()・getAudience()・getSubject()は
  * 親インタフェースのデフォルト実装（ID Tokenから直接取得）が用いられる。</p>
+ *
+ * <p>identityIdは「どの認証方法経由でログインしたか」を示す。</p>
  *
  * @author Jun Kobayashi
  */
@@ -40,13 +42,16 @@ public final class SystemUserPrincipal implements OidcUser {
     /** システム管理アカウントID（system_accounts.account_id） */
     private final String accountId;
 
-    /** OIDC Issuer（issクレーム・system_accounts.iss相当） */
+    /** 認証に使われたidentityのID（system_account_identities.identity_id） */
+    private final String identityId;
+
+    /** OIDC Issuer（issクレーム・identity.iss相当） */
     private final String iss;
 
-    /** OIDC Audience（system_accounts.aud相当・clientId） */
+    /** OIDC Audience（identity.aud相当・clientId） */
     private final String aud;
 
-    /** OIDC Subject（subクレーム・system_accounts.sub相当） */
+    /** OIDC Subject（subクレーム・identity.sub相当） */
     private final String sub;
 
     /** ID Token */
@@ -62,6 +67,7 @@ public final class SystemUserPrincipal implements OidcUser {
      * コンストラクタ
      *
      * @param accountId システム管理アカウントID
+     * @param identityId 認証に使われたidentityのID
      * @param iss OIDC Issuer
      * @param aud OIDC Audience
      * @param sub OIDC Subject
@@ -71,6 +77,7 @@ public final class SystemUserPrincipal implements OidcUser {
      */
     public SystemUserPrincipal(
             String accountId,
+            String identityId,
             String iss,
             String aud,
             String sub,
@@ -78,6 +85,7 @@ public final class SystemUserPrincipal implements OidcUser {
             OidcUserInfo userInfo,
             Collection<? extends GrantedAuthority> authorities) {
         this.accountId = Objects.requireNonNull(accountId, "accountId must not be null");
+        this.identityId = Objects.requireNonNull(identityId, "identityId must not be null");
         this.iss = Objects.requireNonNull(iss, "iss must not be null");
         this.aud = Objects.requireNonNull(aud, "aud must not be null");
         this.sub = Objects.requireNonNull(sub, "sub must not be null");
@@ -91,6 +99,7 @@ public final class SystemUserPrincipal implements OidcUser {
      * SYSTEM_ADMINロールを持つPrincipalを構築する。
      *
      * @param accountId アカウントID
+     * @param identityId 認証に使われたidentityのID
      * @param iss Issuer
      * @param aud Audience
      * @param sub Subject
@@ -99,6 +108,7 @@ public final class SystemUserPrincipal implements OidcUser {
      */
     public static SystemUserPrincipal ofSystemAdmin(
             String accountId,
+            String identityId,
             String iss,
             String aud,
             String sub,
@@ -106,7 +116,7 @@ public final class SystemUserPrincipal implements OidcUser {
         Set<GrantedAuthority> roles =
                 Set.of(new SimpleGrantedAuthority(ROLE_SYSTEM_ADMIN));
         return new SystemUserPrincipal(
-                accountId, iss, aud, sub, idToken, null, roles);
+                accountId, identityId, iss, aud, sub, idToken, null, roles);
     }
 
     /**

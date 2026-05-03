@@ -1,6 +1,7 @@
 package io.github.kizulog_community.kizulog.domain.systemaccount.model;
 
 import java.time.OffsetDateTime;
+
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
@@ -16,14 +17,17 @@ import lombok.Getter;
 @AllArgsConstructor
 public class SystemAccountRole {
 
-    /** アカウントID */
+    /** ロール紐付けID（UUID） */
+    private final String roleId;
+
+    /** バージョン */
+    private final OffsetDateTime version;
+
+    /** 紐付くアカウントID */
     private final String accountId;
 
     /** ロール */
     private final SystemRole role;
-
-    /** バージョン */
-    private final OffsetDateTime version;
 
     /** 作成日時（UTC） */
     private final OffsetDateTime createdAt;

@@ -27,10 +27,6 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
  * <p>Output Port（SystemAccountRepository）のメソッドについて、
  * 正常系・境界値・異常系を検証する。</p>
  *
- * <p>テスト対象は SystemAccountRepositoryImpl のみ。
- * Spring Data JPA提供の SystemAccountJpaRepository は
- * フレームワーク提供のためテスト対象外。</p>
- *
  * @author Jun Kobayashi
  */
 @DataJpaTest
@@ -59,32 +55,30 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
      * テストデータ投入ヘルパー（JPA直接保存）
      */
     private void saveEntity(
-            String accountId, OffsetDateTime version,
-            String iss, String aud, String sub, String createdBy) {
+            String accountId, OffsetDateTime version, String createdBy) {
         SystemAccountEntity entity = new SystemAccountEntity(
                 new SystemAccountId(accountId, version),
-                iss, aud, sub, version, createdBy);
+                version, createdBy);
         jpaRepository.save(entity);
     }
 
     // ========================================================================
-    // findLatestByIssAndAudAndSub
+    // findLatestByAccountId
     // ========================================================================
 
     @Test
-    @DisplayName("findLatestByIssAndAudAndSub: 同一(iss,aud,sub)で複数バージョンが存在する場合、最大versionのレコードを返す")
-    void findLatestByIssAndAudAndSub_returnsLatestVersion_whenMultipleVersionsExist() {
+    @DisplayName("findLatestByAccountId: 同一accountIdで複数バージョンが存在する場合、最大versionのレコードを返す")
+    void findLatestByAccountId_returnsLatestVersion_whenMultipleVersionsExist() {
         // given
         OffsetDateTime v1 = BASE_TIME;
         OffsetDateTime v2 = BASE_TIME.plusHours(1);
         OffsetDateTime v3 = BASE_TIME.plusHours(2);
-        saveEntity("acc-1", v1, "iss-A", "aud-A", "sub-A", "user:1");
-        saveEntity("acc-1", v3, "iss-A", "aud-A", "sub-A", "user:3");
-        saveEntity("acc-1", v2, "iss-A", "aud-A", "sub-A", "user:2");
+        saveEntity("acc-1", v1, "user:1");
+        saveEntity("acc-1", v3, "user:3");
+        saveEntity("acc-1", v2, "user:2");
 
         // when
-        Optional<SystemAccount> result =
-                sut.findLatestByIssAndAudAndSub("iss-A", "aud-A", "sub-A");
+        Optional<SystemAccount> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).isPresent();
@@ -94,14 +88,13 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
     }
 
     @Test
-    @DisplayName("findLatestByIssAndAudAndSub: 単一バージョンしか存在しない場合、そのレコードを返す")
-    void findLatestByIssAndAudAndSub_returnsSingleVersion_whenOnlyOneExists() {
+    @DisplayName("findLatestByAccountId: 単一バージョンしか存在しない場合、そのレコードを返す")
+    void findLatestByAccountId_returnsSingleVersion_whenOnlyOneExists() {
         // given
-        saveEntity("acc-1", BASE_TIME, "iss-A", "aud-A", "sub-A", "system:setup");
+        saveEntity("acc-1", BASE_TIME, "system:setup");
 
         // when
-        Optional<SystemAccount> result =
-                sut.findLatestByIssAndAudAndSub("iss-A", "aud-A", "sub-A");
+        Optional<SystemAccount> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).isPresent();
@@ -109,44 +102,38 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
     }
 
     @Test
-    @DisplayName("findLatestByIssAndAudAndSub: 該当(iss,aud,sub)が存在しない場合、空のOptionalを返す")
-    void findLatestByIssAndAudAndSub_returnsEmpty_whenNotFound() {
+    @DisplayName("findLatestByAccountId: 該当accountIdが存在しない場合、空のOptionalを返す")
+    void findLatestByAccountId_returnsEmpty_whenNotFound() {
         // given
-        saveEntity("acc-1", BASE_TIME, "iss-A", "aud-A", "sub-A", "user:1");
+        saveEntity("acc-1", BASE_TIME, "user:1");
 
         // when
-        Optional<SystemAccount> result =
-                sut.findLatestByIssAndAudAndSub("iss-X", "aud-X", "sub-X");
+        Optional<SystemAccount> result = sut.findLatestByAccountId("acc-X");
 
         // then
         assertThat(result).isEmpty();
     }
 
     @Test
-    @DisplayName("findLatestByIssAndAudAndSub: テーブルが空の場合、空のOptionalを返す")
-    void findLatestByIssAndAudAndSub_returnsEmpty_whenTableIsEmpty() {
+    @DisplayName("findLatestByAccountId: テーブルが空の場合、空のOptionalを返す")
+    void findLatestByAccountId_returnsEmpty_whenTableIsEmpty() {
         // when
-        Optional<SystemAccount> result =
-                sut.findLatestByIssAndAudAndSub("iss-A", "aud-A", "sub-A");
+        Optional<SystemAccount> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).isEmpty();
     }
 
     @Test
-    @DisplayName("findLatestByIssAndAudAndSub: 複数(iss,aud,sub)が混在する場合、指定組合せの最新のみを返す")
-    void findLatestByIssAndAudAndSub_returnsOnlySpecifiedTriple() {
+    @DisplayName("findLatestByAccountId: 複数accountIdが混在する場合、指定accountIdのみを返す")
+    void findLatestByAccountId_returnsOnlySpecifiedAccountId() {
         // given
-        saveEntity("acc-1", BASE_TIME,
-                "iss-A", "aud-A", "sub-A", "user:1");
-        saveEntity("acc-1", BASE_TIME.plusHours(1),
-                "iss-A", "aud-A", "sub-A", "user:2");
-        saveEntity("acc-2", BASE_TIME.plusHours(2),
-                "iss-B", "aud-B", "sub-B", "user:3");
+        saveEntity("acc-1", BASE_TIME, "user:1");
+        saveEntity("acc-1", BASE_TIME.plusHours(1), "user:2");
+        saveEntity("acc-2", BASE_TIME.plusHours(2), "user:3");
 
         // when
-        Optional<SystemAccount> result =
-                sut.findLatestByIssAndAudAndSub("iss-A", "aud-A", "sub-A");
+        Optional<SystemAccount> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).isPresent();
@@ -163,8 +150,7 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
     void save_persistsNewRecord() {
         // given
         SystemAccount account = new SystemAccount(
-                "acc-1", BASE_TIME, "iss-A", "aud-A", "sub-A",
-                BASE_TIME, "system:setup");
+                "acc-1", BASE_TIME, BASE_TIME, "system:setup");
 
         // when
         sut.save(account);
@@ -179,10 +165,8 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
         // given
         OffsetDateTime v1 = BASE_TIME;
         OffsetDateTime v2 = BASE_TIME.plusHours(1);
-        SystemAccount a1 = new SystemAccount(
-                "acc-1", v1, "iss-A", "aud-A", "sub-A", v1, "user:1");
-        SystemAccount a2 = new SystemAccount(
-                "acc-1", v2, "iss-A", "aud-A", "sub-A", v2, "user:2");
+        SystemAccount a1 = new SystemAccount("acc-1", v1, v1, "user:1");
+        SystemAccount a2 = new SystemAccount("acc-1", v2, v2, "user:2");
 
         // when
         sut.save(a1);
@@ -198,22 +182,16 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
     void save_persistsAllFields() {
         // given
         SystemAccount account = new SystemAccount(
-                "acc-1", BASE_TIME,
-                "iss-value", "aud-value", "sub-value",
-                BASE_TIME, "system:test");
+                "acc-1", BASE_TIME, BASE_TIME, "system:test");
 
         // when
         sut.save(account);
 
         // then
-        Optional<SystemAccount> loaded =
-                sut.findLatestByIssAndAudAndSub("iss-value", "aud-value", "sub-value");
+        Optional<SystemAccount> loaded = sut.findLatestByAccountId("acc-1");
         assertThat(loaded).isPresent();
         assertThat(loaded.get().getAccountId()).isEqualTo("acc-1");
         assertThat(loaded.get().getVersion()).isEqualTo(BASE_TIME);
-        assertThat(loaded.get().getIss()).isEqualTo("iss-value");
-        assertThat(loaded.get().getAud()).isEqualTo("aud-value");
-        assertThat(loaded.get().getSub()).isEqualTo("sub-value");
         assertThat(loaded.get().getCreatedAt()).isEqualTo(BASE_TIME);
         assertThat(loaded.get().getCreatedBy()).isEqualTo("system:test");
     }

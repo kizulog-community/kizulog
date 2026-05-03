@@ -10,28 +10,26 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
 import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountId;
 
 /**
+ * システム管理アカウントJPAリポジトリ
+ *
  * @author Jun Kobayashi
  */
 public interface SystemAccountJpaRepository
         extends JpaRepository<SystemAccountEntity, SystemAccountId> {
 
-    // 指定された(iss, aud, sub)の最新バージョンを取得
-    @Query("""
-            SELECT s FROM SystemAccountEntity s
-            WHERE s.iss = :iss
-            AND s.aud = :aud
-            AND s.sub = :sub
-            AND s.id.version = (
-                SELECT MAX(s2.id.version)
-                FROM SystemAccountEntity s2
-                WHERE s2.iss = :iss
-                AND s2.aud = :aud
-                AND s2.sub = :sub
-            )
-            """)
-    Optional<SystemAccountEntity> findLatestByIssAndAudAndSub(
-            @Param("iss") String iss,
-            @Param("aud") String aud,
-            @Param("sub") String sub);
+    /**
+     * accountIdで最新バージョンのアカウントを取得する。
+     *
+     * @param accountId アカウントID
+     * @return 最新バージョンのアカウント
+     */
+    @Query("SELECT e FROM SystemAccountEntity e "
+            + "WHERE e.id.accountId = :accountId "
+            + "AND e.id.version = ("
+            + "    SELECT MAX(e2.id.version) FROM SystemAccountEntity e2 "
+            + "    WHERE e2.id.accountId = :accountId"
+            + ")")
+    Optional<SystemAccountEntity> findLatestByAccountId(
+            @Param("accountId") String accountId);
 
 }

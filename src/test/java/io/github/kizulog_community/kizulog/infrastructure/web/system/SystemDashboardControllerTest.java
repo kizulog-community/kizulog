@@ -45,6 +45,7 @@ class SystemDashboardControllerTest {
         // given
         SystemUserPrincipal principal = SystemUserPrincipal.ofSystemAdmin(
                 "account-id-1",
+                "identity-id-1",
                 "https://auth.example.com/realms/kizulog",
                 "kizulog-system",
                 "user-sub-1",

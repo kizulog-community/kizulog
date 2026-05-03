@@ -10,25 +10,25 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
 import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountRoleId;
 
 /**
+ * システム管理アカウントロールJPAリポジトリ
+ *
  * @author Jun Kobayashi
  */
 public interface SystemAccountRoleJpaRepository
         extends JpaRepository<SystemAccountRoleEntity, SystemAccountRoleId> {
 
-    /*
-     * 相関サブクエリで(account_id, role)の組み合わせごとに最新versionを取得する。
-     * 内側のs2で外側のs.id.roleを参照することで、role単位での最新を取得できる。
+    /**
+     * accountIdに紐付く全ロールの最新バージョンを取得する。
+     *
+     * <p>1つのaccountに複数のロール紐付け(role_id)がある場合、
+     * 各role_id毎の最新バージョンを返す。</p>
      */
-    @Query("""
-            SELECT s FROM SystemAccountRoleEntity s
-            WHERE s.id.accountId = :accountId
-            AND s.id.version = (
-                SELECT MAX(s2.id.version)
-                FROM SystemAccountRoleEntity s2
-                WHERE s2.id.accountId = :accountId
-                AND s2.id.role = s.id.role
-            )
-            """)
+    @Query("SELECT e FROM SystemAccountRoleEntity e "
+            + "WHERE e.accountId = :accountId "
+            + "AND e.id.version = ("
+            + "    SELECT MAX(e2.id.version) FROM SystemAccountRoleEntity e2 "
+            + "    WHERE e2.id.roleId = e.id.roleId"
+            + ")")
     List<SystemAccountRoleEntity> findLatestByAccountId(
             @Param("accountId") String accountId);
 

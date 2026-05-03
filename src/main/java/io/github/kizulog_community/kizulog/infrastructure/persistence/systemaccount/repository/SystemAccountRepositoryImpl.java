@@ -11,10 +11,7 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
 import lombok.RequiredArgsConstructor;
 
 /**
- * システム管理アカウントリポジトリ実装クラス（アダプター）
- *
- * <p>ドメイン層のOutput Port（{@link SystemAccountRepository}）の実装クラス。
- * Spring Data JPAを使用してPostgreSQLへのアクセスを提供する。</p>
+ * システム管理アカウントリポジトリ実装
  *
  * @author Jun Kobayashi
  */
@@ -22,63 +19,38 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class SystemAccountRepositoryImpl implements SystemAccountRepository {
 
-    /** JPAリポジトリ */
     private final SystemAccountJpaRepository jpaRepository;
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
-    public Optional<SystemAccount> findLatestByIssAndAudAndSub(
-            String iss, String aud, String sub) {
-        return jpaRepository.findLatestByIssAndAudAndSub(iss, aud, sub)
+    public Optional<SystemAccount> findLatestByAccountId(String accountId) {
+        return jpaRepository.findLatestByAccountId(accountId)
                 .map(this::toDomain);
     }
 
-    /**
-     * {@inheritDoc}
-     */
     @Override
     public void save(SystemAccount systemAccount) {
         jpaRepository.save(toEntity(systemAccount));
     }
 
     /**
-     * Entityをドメインモデルにマップする。
-     *
-     * @param entity Entity
-     * @return ドメインモデル
+     * EntityからDomainModelに変換する。
      */
     private SystemAccount toDomain(SystemAccountEntity entity) {
         return new SystemAccount(
                 entity.getId().getAccountId(),
                 entity.getId().getVersion(),
-                entity.getIss(),
-                entity.getAud(),
-                entity.getSub(),
                 entity.getCreatedAt(),
-                entity.getCreatedBy()
-        );
+                entity.getCreatedBy());
     }
 
     /**
-     * ドメインモデルをEntityにマップする。
-     *
-     * @param systemAccount ドメインモデル
-     * @return Entity
+     * DomainModelからEntityに変換する。
      */
-    private SystemAccountEntity toEntity(SystemAccount systemAccount) {
+    private SystemAccountEntity toEntity(SystemAccount domain) {
         return new SystemAccountEntity(
-                new SystemAccountId(
-                        systemAccount.getAccountId(),
-                        systemAccount.getVersion()
-                ),
-                systemAccount.getIss(),
-                systemAccount.getAud(),
-                systemAccount.getSub(),
-                systemAccount.getCreatedAt(),
-                systemAccount.getCreatedBy()
-        );
+                new SystemAccountId(domain.getAccountId(), domain.getVersion()),
+                domain.getCreatedAt(),
+                domain.getCreatedBy());
     }
 
 }

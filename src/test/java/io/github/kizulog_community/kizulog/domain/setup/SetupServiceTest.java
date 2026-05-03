@@ -23,11 +23,17 @@ import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentityStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountRoleStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
 import io.github.kizulog_community.kizulog.domain.systemconfig.port.SystemConfigRepository;
@@ -43,8 +49,11 @@ class SetupServiceTest {
 
     private SystemConfigRepository systemConfigRepository;
     private SystemAccountRepository systemAccountRepository;
-    private SystemAccountRoleRepository systemAccountRoleRepository;
     private SystemAccountStatusRepository systemAccountStatusRepository;
+    private SystemAccountIdentityRepository systemAccountIdentityRepository;
+    private SystemAccountIdentityStatusRepository systemAccountIdentityStatusRepository;
+    private SystemAccountRoleRepository systemAccountRoleRepository;
+    private SystemAccountRoleStatusRepository systemAccountRoleStatusRepository;
     private CryptoPort cryptoPort;
     private ObjectMapper objectMapper;
     private SetupService service;
@@ -53,16 +62,22 @@ class SetupServiceTest {
     void setUp() {
         systemConfigRepository = mock(SystemConfigRepository.class);
         systemAccountRepository = mock(SystemAccountRepository.class);
-        systemAccountRoleRepository = mock(SystemAccountRoleRepository.class);
         systemAccountStatusRepository = mock(SystemAccountStatusRepository.class);
+        systemAccountIdentityRepository = mock(SystemAccountIdentityRepository.class);
+        systemAccountIdentityStatusRepository = mock(SystemAccountIdentityStatusRepository.class);
+        systemAccountRoleRepository = mock(SystemAccountRoleRepository.class);
+        systemAccountRoleStatusRepository = mock(SystemAccountRoleStatusRepository.class);
         cryptoPort = mock(CryptoPort.class);
         objectMapper = new ObjectMapper();
 
         service = new SetupService(
                 systemConfigRepository,
                 systemAccountRepository,
-                systemAccountRoleRepository,
                 systemAccountStatusRepository,
+                systemAccountIdentityRepository,
+                systemAccountIdentityStatusRepository,
+                systemAccountRoleRepository,
+                systemAccountRoleStatusRepository,
                 cryptoPort,
                 objectMapper);
     }
@@ -157,7 +172,7 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でsystem_accountsが保存される")
+    @DisplayName("save()でsystem_accountsが保存される（accountIdのみ、iss/aud/subはidentity側）")
     void save_savesSystemAccount() {
         when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
@@ -168,25 +183,7 @@ class SetupServiceTest {
 
         SystemAccount account = captor.getValue();
         assertThat(account.getAccountId()).isNotBlank();
-        assertThat(account.getIss()).isEqualTo("https://auth.example.com/realms/master");
-        assertThat(account.getAud()).isEqualTo("kizulog-client");
-        assertThat(account.getSub()).isEqualTo("user-uuid-123");
         assertThat(account.getCreatedBy()).isEqualTo("system:setup-wizard");
-    }
-
-    @Test
-    @DisplayName("save()でsystem_account_rolesがSYSTEM_ADMINで保存される")
-    void save_savesSystemAccountRoleAsSystemAdmin() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
-        service.save(createSessionData());
-
-        ArgumentCaptor<SystemAccountRole> captor =
-                ArgumentCaptor.forClass(SystemAccountRole.class);
-        verify(systemAccountRoleRepository).save(captor.capture());
-
-        SystemAccountRole role = captor.getValue();
-        assertThat(role.getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
-        assertThat(role.getCreatedBy()).isEqualTo("system:setup-wizard");
     }
 
     @Test
@@ -206,25 +203,131 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でアカウント・ロール・ステータスが同じaccountIdで保存される")
+    @DisplayName("save()でsystem_account_identitiesがiss/aud/sub付きで保存される")
+    void save_savesSystemAccountIdentity() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountIdentity> captor =
+                ArgumentCaptor.forClass(SystemAccountIdentity.class);
+        verify(systemAccountIdentityRepository).save(captor.capture());
+
+        SystemAccountIdentity identity = captor.getValue();
+        assertThat(identity.getIdentityId()).isNotBlank();
+        assertThat(identity.getIss()).isEqualTo("https://auth.example.com/realms/master");
+        assertThat(identity.getAud()).isEqualTo("kizulog-client");
+        assertThat(identity.getSub()).isEqualTo("user-uuid-123");
+        assertThat(identity.getCreatedBy()).isEqualTo("system:setup-wizard");
+    }
+
+    @Test
+    @DisplayName("save()でsystem_account_identity_statusがACTIVEで保存される")
+    void save_savesSystemAccountIdentityStatusAsActive() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountIdentityStatus> captor =
+                ArgumentCaptor.forClass(SystemAccountIdentityStatus.class);
+        verify(systemAccountIdentityStatusRepository).save(captor.capture());
+
+        SystemAccountIdentityStatus status = captor.getValue();
+        assertThat(status.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(status.getReason()).isNull();
+        assertThat(status.getCreatedBy()).isEqualTo("system:setup-wizard");
+    }
+
+    @Test
+    @DisplayName("save()でsystem_account_rolesがSYSTEM_ADMINで保存される（role_idベース）")
+    void save_savesSystemAccountRoleAsSystemAdmin() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountRole> captor =
+                ArgumentCaptor.forClass(SystemAccountRole.class);
+        verify(systemAccountRoleRepository).save(captor.capture());
+
+        SystemAccountRole role = captor.getValue();
+        assertThat(role.getRoleId()).isNotBlank();
+        assertThat(role.getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
+        assertThat(role.getCreatedBy()).isEqualTo("system:setup-wizard");
+    }
+
+    @Test
+    @DisplayName("save()でsystem_account_role_statusがACTIVEで保存される")
+    void save_savesSystemAccountRoleStatusAsActive() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountRoleStatus> captor =
+                ArgumentCaptor.forClass(SystemAccountRoleStatus.class);
+        verify(systemAccountRoleStatusRepository).save(captor.capture());
+
+        SystemAccountRoleStatus status = captor.getValue();
+        assertThat(status.getStatus()).isEqualTo(AccountStatus.ACTIVE);
+        assertThat(status.getReason()).isNull();
+        assertThat(status.getCreatedBy()).isEqualTo("system:setup-wizard");
+    }
+
+    @Test
+    @DisplayName("save()でアカウント・ステータス・identityが同じaccountIdで保存される")
     void save_useSameAccountIdAcrossEntities() {
         when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccount> accountCaptor =
                 ArgumentCaptor.forClass(SystemAccount.class);
+        ArgumentCaptor<SystemAccountStatus> accountStatusCaptor =
+                ArgumentCaptor.forClass(SystemAccountStatus.class);
+        ArgumentCaptor<SystemAccountIdentity> identityCaptor =
+                ArgumentCaptor.forClass(SystemAccountIdentity.class);
         ArgumentCaptor<SystemAccountRole> roleCaptor =
                 ArgumentCaptor.forClass(SystemAccountRole.class);
-        ArgumentCaptor<SystemAccountStatus> statusCaptor =
-                ArgumentCaptor.forClass(SystemAccountStatus.class);
 
         verify(systemAccountRepository).save(accountCaptor.capture());
+        verify(systemAccountStatusRepository).save(accountStatusCaptor.capture());
+        verify(systemAccountIdentityRepository).save(identityCaptor.capture());
         verify(systemAccountRoleRepository).save(roleCaptor.capture());
-        verify(systemAccountStatusRepository).save(statusCaptor.capture());
 
         String accountId = accountCaptor.getValue().getAccountId();
+        assertThat(accountStatusCaptor.getValue().getAccountId()).isEqualTo(accountId);
+        assertThat(identityCaptor.getValue().getAccountId()).isEqualTo(accountId);
         assertThat(roleCaptor.getValue().getAccountId()).isEqualTo(accountId);
-        assertThat(statusCaptor.getValue().getAccountId()).isEqualTo(accountId);
+    }
+
+    @Test
+    @DisplayName("save()でidentityとidentity_statusが同じidentityIdで保存される")
+    void save_useSameIdentityIdAcrossIdentityEntities() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountIdentity> identityCaptor =
+                ArgumentCaptor.forClass(SystemAccountIdentity.class);
+        ArgumentCaptor<SystemAccountIdentityStatus> statusCaptor =
+                ArgumentCaptor.forClass(SystemAccountIdentityStatus.class);
+
+        verify(systemAccountIdentityRepository).save(identityCaptor.capture());
+        verify(systemAccountIdentityStatusRepository).save(statusCaptor.capture());
+
+        assertThat(statusCaptor.getValue().getIdentityId())
+                .isEqualTo(identityCaptor.getValue().getIdentityId());
+    }
+
+    @Test
+    @DisplayName("save()でroleとrole_statusが同じroleIdで保存される")
+    void save_useSameRoleIdAcrossRoleEntities() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+        service.save(createSessionData());
+
+        ArgumentCaptor<SystemAccountRole> roleCaptor =
+                ArgumentCaptor.forClass(SystemAccountRole.class);
+        ArgumentCaptor<SystemAccountRoleStatus> statusCaptor =
+                ArgumentCaptor.forClass(SystemAccountRoleStatus.class);
+
+        verify(systemAccountRoleRepository).save(roleCaptor.capture());
+        verify(systemAccountRoleStatusRepository).save(statusCaptor.capture());
+
+        assertThat(statusCaptor.getValue().getRoleId())
+                .isEqualTo(roleCaptor.getValue().getRoleId());
     }
 
     @Test
@@ -239,8 +342,11 @@ class SetupServiceTest {
         SetupService failingService = new SetupService(
                 systemConfigRepository,
                 systemAccountRepository,
-                systemAccountRoleRepository,
                 systemAccountStatusRepository,
+                systemAccountIdentityRepository,
+                systemAccountIdentityStatusRepository,
+                systemAccountRoleRepository,
+                systemAccountRoleStatusRepository,
                 cryptoPort,
                 mockMapper);
 

@@ -24,16 +24,6 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemacco
 /**
  * SystemAccountRoleRepositoryImpl の統合テスト
  *
- * <p>Output Port（SystemAccountRoleRepository）のメソッドについて、
- * 正常系・境界値・異常系を検証する。</p>
- *
- * <p>テスト対象は SystemAccountRoleRepositoryImpl のみ。
- * Spring Data JPA提供の SystemAccountRoleJpaRepository は
- * フレームワーク提供のためテスト対象外。</p>
- *
- * <p>SystemAccountRoleはPK=(account_id, role, version)であり、1アカウントが複数ロールを持てる構造。
- * findLatestByAccountIdは(account_id, role)の組み合わせごとに最新versionを取得する設計。</p>
- *
  * @author Jun Kobayashi
  */
 @DataJpaTest
@@ -62,10 +52,11 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
      * テストデータ投入ヘルパー（JPA直接保存）
      */
     private void saveEntity(
-            String accountId, SystemRole role, OffsetDateTime version, String createdBy) {
+            String roleId, OffsetDateTime version,
+            String accountId, SystemRole role, String createdBy) {
         SystemAccountRoleEntity entity = new SystemAccountRoleEntity(
-                new SystemAccountRoleId(accountId, role, version),
-                version, createdBy);
+                new SystemAccountRoleId(roleId, version),
+                accountId, role, version, createdBy);
         jpaRepository.save(entity);
     }
 
@@ -74,21 +65,22 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     // ========================================================================
 
     @Test
-    @DisplayName("findLatestByAccountId: 同一(accountId, role)で複数バージョンが存在する場合、最大versionのレコードを返す")
+    @DisplayName("findLatestByAccountId: 同一role_idで複数バージョンが存在する場合、最大versionのレコードを返す")
     void findLatestByAccountId_returnsLatestVersion_whenMultipleVersionsExist() {
-        // given
+        // given - 同じrole_idで複数version
         OffsetDateTime v1 = BASE_TIME;
         OffsetDateTime v2 = BASE_TIME.plusHours(1);
         OffsetDateTime v3 = BASE_TIME.plusHours(2);
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, v1, "user:1");
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, v3, "user:3");
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, v2, "user:2");
+        saveEntity("role-1", v1, "acc-1", SystemRole.SYSTEM_ADMIN, "user:1");
+        saveEntity("role-1", v3, "acc-1", SystemRole.SYSTEM_ADMIN, "user:3");
+        saveEntity("role-1", v2, "acc-1", SystemRole.SYSTEM_ADMIN, "user:2");
 
         // when
         List<SystemAccountRole> result = sut.findLatestByAccountId("acc-1");
 
-        // then
+        // then - role-1の最新版（v3）のみ
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).getRoleId()).isEqualTo("role-1");
         assertThat(result.get(0).getAccountId()).isEqualTo("acc-1");
         assertThat(result.get(0).getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
         assertThat(result.get(0).getVersion()).isEqualTo(v3);
@@ -96,16 +88,17 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     }
 
     @Test
-    @DisplayName("findLatestByAccountId: 単一ロールが1件のみ存在する場合、そのレコードを返す")
+    @DisplayName("findLatestByAccountId: 単一role_idが1件のみ存在する場合、そのレコードを返す")
     void findLatestByAccountId_returnsSingleRole_whenOnlyOneExists() {
         // given
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, BASE_TIME, "system:setup");
+        saveEntity("role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN, "system:setup");
 
         // when
         List<SystemAccountRole> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).getRoleId()).isEqualTo("role-1");
         assertThat(result.get(0).getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
     }
 
@@ -113,7 +106,7 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     @DisplayName("findLatestByAccountId: 該当accountIdが存在しない場合、空リストを返す")
     void findLatestByAccountId_returnsEmpty_whenNotFound() {
         // given
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, BASE_TIME, "user:1");
+        saveEntity("role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN, "user:1");
 
         // when
         List<SystemAccountRole> result = sut.findLatestByAccountId("acc-X");
@@ -136,15 +129,32 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     @DisplayName("findLatestByAccountId: 複数accountIdが混在する場合、指定accountIdのみを返す")
     void findLatestByAccountId_returnsOnlySpecifiedAccountId() {
         // given
-        saveEntity("acc-1", SystemRole.SYSTEM_ADMIN, BASE_TIME, "user:1");
-        saveEntity("acc-2", SystemRole.SYSTEM_ADMIN, BASE_TIME.plusHours(1), "user:2");
+        saveEntity("role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN, "user:1");
+        saveEntity("role-2", BASE_TIME.plusHours(1), "acc-2", SystemRole.SYSTEM_ADMIN, "user:2");
 
         // when
         List<SystemAccountRole> result = sut.findLatestByAccountId("acc-1");
 
         // then
         assertThat(result).hasSize(1);
+        assertThat(result.get(0).getRoleId()).isEqualTo("role-1");
         assertThat(result.get(0).getAccountId()).isEqualTo("acc-1");
+    }
+
+    @Test
+    @DisplayName("findLatestByAccountId: 同一accountIdに複数role_idがある場合、各role_idの最新版を全て返す")
+    void findLatestByAccountId_returnsAllRolesForAccount() {
+        // given - 同じacc-1に異なるrole_idで2つのロール
+        saveEntity("role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN, "user:1");
+        saveEntity("role-2", BASE_TIME.plusHours(1), "acc-1", SystemRole.SYSTEM_ADMIN, "user:2");
+
+        // when
+        List<SystemAccountRole> result = sut.findLatestByAccountId("acc-1");
+
+        // then - 両方が返る（同じrole名でも別role_idなので別レコードとして扱う）
+        assertThat(result).hasSize(2);
+        assertThat(result).extracting(SystemAccountRole::getRoleId)
+                .containsExactlyInAnyOrder("role-1", "role-2");
     }
 
     // ========================================================================
@@ -156,7 +166,8 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     void save_persistsNewRecord() {
         // given
         SystemAccountRole role = new SystemAccountRole(
-                "acc-1", SystemRole.SYSTEM_ADMIN, BASE_TIME, BASE_TIME, "system:setup");
+                "role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN,
+                BASE_TIME, "system:setup");
 
         // when
         sut.save(role);
@@ -166,15 +177,15 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     }
 
     @Test
-    @DisplayName("save: 同一(accountId, role)で複数バージョンを保存すると全バージョンが残る")
+    @DisplayName("save: 同一role_idで複数バージョンを保存すると全バージョンが残る")
     void save_persistsMultipleVersions() {
         // given
         OffsetDateTime v1 = BASE_TIME;
         OffsetDateTime v2 = BASE_TIME.plusHours(1);
         SystemAccountRole r1 = new SystemAccountRole(
-                "acc-1", SystemRole.SYSTEM_ADMIN, v1, v1, "user:1");
+                "role-1", v1, "acc-1", SystemRole.SYSTEM_ADMIN, v1, "user:1");
         SystemAccountRole r2 = new SystemAccountRole(
-                "acc-1", SystemRole.SYSTEM_ADMIN, v2, v2, "user:2");
+                "role-1", v2, "acc-1", SystemRole.SYSTEM_ADMIN, v2, "user:2");
 
         // when
         sut.save(r1);
@@ -190,7 +201,8 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
     void save_persistsAllFields() {
         // given
         SystemAccountRole role = new SystemAccountRole(
-                "acc-1", SystemRole.SYSTEM_ADMIN, BASE_TIME, BASE_TIME, "system:test");
+                "role-1", BASE_TIME, "acc-1", SystemRole.SYSTEM_ADMIN,
+                BASE_TIME, "system:test");
 
         // when
         sut.save(role);
@@ -198,6 +210,7 @@ class SystemAccountRoleRepositoryImplIT extends AbstractRepositoryIT {
         // then
         List<SystemAccountRole> loaded = sut.findLatestByAccountId("acc-1");
         assertThat(loaded).hasSize(1);
+        assertThat(loaded.get(0).getRoleId()).isEqualTo("role-1");
         assertThat(loaded.get(0).getAccountId()).isEqualTo("acc-1");
         assertThat(loaded.get(0).getRole()).isEqualTo(SystemRole.SYSTEM_ADMIN);
         assertThat(loaded.get(0).getVersion()).isEqualTo(BASE_TIME);

@@ -11,13 +11,16 @@ package io.github.kizulog_community.kizulog.domain.systemauth.exception;
  */
 public enum SystemAuthenticationErrorType {
 
-    /** アカウント未登録（iss/aud/subに一致するsystem_accountsレコードなし） */
+    /** アカウント未登録（iss/aud/subに一致するidentityレコードなし、または紐付くアカウントなし） */
     ACCOUNT_NOT_FOUND,
+
+    /** 認証方法が無効化されている（identityのstatusがACTIVE以外） */
+    IDENTITY_INACTIVE,
 
     /** アカウント無効（system_account_status.statusがACTIVE以外） */
     ACCOUNT_INACTIVE,
 
-    /** SYSTEM_ADMINロール未付与 */
+    /** SYSTEM_ADMINロール未付与（または無効化されている） */
     ROLE_NOT_GRANTED;
 
 }

@@ -9,7 +9,7 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
-import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccount;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationException;
 import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemAuthenticationService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
@@ -25,7 +25,8 @@ import io.github.kizulog_community.kizulog.infrastructure.security.principal.Sys
  * <ol>
  *   <li>Spring標準の OidcUserService にデリゲートしてID Token検証・UserInfo取得</li>
  *   <li>ID Tokenから iss/sub + ClientRegistrationから aud を抽出</li>
- *   <li>SystemAuthenticationService#authenticateでアカウント突合・認可検証</li>
+ *   <li>SystemAuthenticationService#authenticateでaccount/identity/role検証
+ *       (戻り値はidentity)</li>
  *   <li>SystemUserPrincipalを生成してSpring Securityに返却</li>
  * </ol>
  * 認証失敗時は OAuth2AuthenticationException に変換して投げる。
@@ -95,10 +96,10 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
         String aud = userRequest.getClientRegistration().getClientId();
         String sub = oidcUser.getIdToken().getSubject();
 
-        // 3) ドメイン認証サービスで突合・認可検証
-        SystemAccount account;
+        // 3) ドメイン認証サービスでidentity検索 → アカウント・ロール検証
+        SystemAccountIdentity identity;
         try {
-            account = systemAuthenticationService.authenticate(iss, aud, sub);
+            identity = systemAuthenticationService.authenticate(iss, aud, sub);
         } catch (SystemAuthenticationException e) {
             // ドメイン例外をSpring Security例外に変換
             throw new OAuth2AuthenticationException(
@@ -109,7 +110,8 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
 
         // 4) SystemUserPrincipalを生成してSpring Securityに返却
         return SystemUserPrincipal.ofSystemAdmin(
-                account.getAccountId(),
+                identity.getAccountId(),
+                identity.getIdentityId(),
                 iss,
                 aud,
                 sub,

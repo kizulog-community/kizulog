@@ -2,7 +2,7 @@ package io.github.kizulog_community.kizulog.infrastructure.persistence.systemacc
 
 import java.time.OffsetDateTime;
 
-import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemRole;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
@@ -14,29 +14,29 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * システム管理アカウントロールEntity
+ * システム管理アカウントロールステータスEntity
  *
- * <p>system_account_rolesテーブルにマップする。
- * ロール毎の有効/無効はSystemAccountRoleStatusEntityで管理する。</p>
+ * <p>system_account_role_statusテーブルにマップする。
+ * ロールのACTIVE/INACTIVEを履歴管理する。</p>
  *
  * @author Jun Kobayashi
  */
 @Entity
-@Table(name = "system_account_roles")
+@Table(name = "system_account_role_status")
 @Getter
 @NoArgsConstructor
 @AllArgsConstructor
-public class SystemAccountRoleEntity {
+public class SystemAccountRoleStatusEntity {
 
     @EmbeddedId
-    private SystemAccountRoleId id;
-
-    @Column(name = "account_id", nullable = false)
-    private String accountId;
+    private SystemAccountRoleStatusId id;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "role", nullable = false)
-    private SystemRole role;
+    @Column(name = "status", nullable = false)
+    private AccountStatus status;
+
+    @Column(name = "reason")
+    private String reason;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

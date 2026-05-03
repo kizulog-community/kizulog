@@ -12,17 +12,12 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAcco
 public interface SystemAccountRepository {
 
     /**
-     * iss/aud/subで最新バージョンのシステム管理アカウントを取得する。
+     * accountIdで最新バージョンのシステム管理アカウントを取得する。
      *
-     * <p>同一の(iss, aud, sub)の組み合わせを持つレコードの中で、
-     * versionが最大のレコードを返す。</p>
-     *
-     * @param iss OIDC Issuer
-     * @param aud OIDC Audience
-     * @param sub OIDC Subject
+     * @param accountId アカウントID
      * @return 最新バージョンのシステム管理アカウント。存在しない場合は空のOptional
      */
-    Optional<SystemAccount> findLatestByIssAndAudAndSub(String iss, String aud, String sub);
+    Optional<SystemAccount> findLatestByAccountId(String accountId);
 
     /**
      * システム管理アカウントを保存する。

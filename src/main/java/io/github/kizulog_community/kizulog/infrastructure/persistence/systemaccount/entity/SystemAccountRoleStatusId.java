@@ -11,7 +11,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 /**
- * システム管理アカウントロールの主キー
+ * システム管理アカウントロールステータスの主キー
  *
  * @author Jun Kobayashi
  */
@@ -20,7 +20,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @EqualsAndHashCode
-public class SystemAccountRoleId implements Serializable {
+public class SystemAccountRoleStatusId implements Serializable {
 
     private static final long serialVersionUID = 1L;
 

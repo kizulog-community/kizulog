@@ -25,6 +25,7 @@ import org.springframework.security.oauth2.core.oidc.OidcUserInfo;
 class SystemUserPrincipalTest {
 
     private static final String ACCOUNT_ID = "11111111-1111-1111-1111-111111111111";
+    private static final String IDENTITY_ID = "22222222-2222-2222-2222-222222222222";
     private static final String ISS = "https://auth.dev.internal/realms/master";
     private static final String AUD = "kizulog-master";
     private static final String SUB = "user-sub-123";
@@ -52,9 +53,10 @@ class SystemUserPrincipalTest {
                 Set.of(new SimpleGrantedAuthority(SystemUserPrincipal.ROLE_SYSTEM_ADMIN));
 
         SystemUserPrincipal principal = new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken, userInfo, authorities);
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken, userInfo, authorities);
 
         assertThat(principal.getAccountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(principal.getIdentityId()).isEqualTo(IDENTITY_ID);
         assertThat(principal.getIss()).isEqualTo(ISS);
         assertThat(principal.getAud()).isEqualTo(AUD);
         assertThat(principal.getSub()).isEqualTo(SUB);
@@ -69,7 +71,7 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         SystemUserPrincipal principal = new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken, null, List.of());
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken, null, List.of());
 
         assertThat(principal.getUserInfo()).isNull();
     }
@@ -80,8 +82,18 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                null, ISS, AUD, SUB, idToken, null, List.of()))
+                null, IDENTITY_ID, ISS, AUD, SUB, idToken, null, List.of()))
                 .withMessageContaining("accountId");
+    }
+
+    @Test
+    @DisplayName("コンストラクタ：identityIdがnullならNullPointerException")
+    void constructor_withNullIdentityId_throwsNpe() {
+        OidcIdToken idToken = sampleIdToken();
+
+        assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
+                ACCOUNT_ID, null, ISS, AUD, SUB, idToken, null, List.of()))
+                .withMessageContaining("identityId");
     }
 
     @Test
@@ -90,7 +102,7 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                ACCOUNT_ID, null, AUD, SUB, idToken, null, List.of()))
+                ACCOUNT_ID, IDENTITY_ID, null, AUD, SUB, idToken, null, List.of()))
                 .withMessageContaining("iss");
     }
 
@@ -100,7 +112,7 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, null, SUB, idToken, null, List.of()))
+                ACCOUNT_ID, IDENTITY_ID, ISS, null, SUB, idToken, null, List.of()))
                 .withMessageContaining("aud");
     }
 
@@ -110,7 +122,7 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, null, idToken, null, List.of()))
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, null, idToken, null, List.of()))
                 .withMessageContaining("sub");
     }
 
@@ -118,7 +130,7 @@ class SystemUserPrincipalTest {
     @DisplayName("コンストラクタ：idTokenがnullならNullPointerException")
     void constructor_withNullIdToken_throwsNpe() {
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, SUB, null, null, List.of()))
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, null, null, List.of()))
                 .withMessageContaining("idToken");
     }
 
@@ -128,7 +140,7 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         assertThatNullPointerException().isThrownBy(() -> new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken, null, null))
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken, null, null))
                 .withMessageContaining("authorities");
     }
 
@@ -137,7 +149,7 @@ class SystemUserPrincipalTest {
     void getAuthorities_returnsUnmodifiableCollection() {
         OidcIdToken idToken = sampleIdToken();
         SystemUserPrincipal principal = new SystemUserPrincipal(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken, null,
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken, null,
                 List.of(new SimpleGrantedAuthority(SystemUserPrincipal.ROLE_SYSTEM_ADMIN)));
 
         Collection<GrantedAuthority> authorities =
@@ -152,12 +164,13 @@ class SystemUserPrincipalTest {
         OidcIdToken idToken = sampleIdToken();
 
         SystemUserPrincipal principal = SystemUserPrincipal.ofSystemAdmin(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken);
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken);
 
         assertThat(principal.getAuthorities())
                 .extracting(GrantedAuthority::getAuthority)
                 .containsExactly(SystemUserPrincipal.ROLE_SYSTEM_ADMIN);
         assertThat(principal.getUserInfo()).isNull();
+        assertThat(principal.getIdentityId()).isEqualTo(IDENTITY_ID);
     }
 
     @Test
@@ -165,7 +178,7 @@ class SystemUserPrincipalTest {
     void getClaims_returnsIdTokenClaims() {
         OidcIdToken idToken = sampleIdToken();
         SystemUserPrincipal principal = SystemUserPrincipal.ofSystemAdmin(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken);
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken);
 
         assertThat(principal.getClaims()).isEqualTo(idToken.getClaims());
     }
@@ -175,7 +188,7 @@ class SystemUserPrincipalTest {
     void getAttributes_returnsIdTokenClaims() {
         OidcIdToken idToken = sampleIdToken();
         SystemUserPrincipal principal = SystemUserPrincipal.ofSystemAdmin(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken);
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken);
 
         assertThat(principal.getAttributes()).isEqualTo(idToken.getClaims());
     }
@@ -185,7 +198,7 @@ class SystemUserPrincipalTest {
     void getName_returnsAccountId() {
         OidcIdToken idToken = sampleIdToken();
         SystemUserPrincipal principal = SystemUserPrincipal.ofSystemAdmin(
-                ACCOUNT_ID, ISS, AUD, SUB, idToken);
+                ACCOUNT_ID, IDENTITY_ID, ISS, AUD, SUB, idToken);
 
         assertThat(principal.getName()).isEqualTo(ACCOUNT_ID);
     }
