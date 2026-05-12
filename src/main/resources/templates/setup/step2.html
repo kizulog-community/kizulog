@@ -42,7 +42,47 @@
             <h5 class="card-title mb-1" th:text="#{setup.step2.title}"></h5>
             <p class="text-muted small mb-4" th:text="#{setup.step2.description}"></p>
 
-            <form th:action="@{/setup/step2}" method="post" id="step2Form">
+            <form th:action="@{/setup/step2}"
+                  th:object="${step2FormData}"
+                  method="post"
+                  id="step2Form"
+                  novalidate>
+
+                <!-- グローバルエラー表示（接続失敗等） -->
+                <div th:if="${#fields.hasGlobalErrors()}"
+                     class="alert alert-danger small mb-3">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    <ul class="mb-0">
+                        <li th:each="err : ${#fields.globalErrors()}"
+                            th:text="${err}">エラー</li>
+                    </ul>
+                </div>
+
+
+                <!-- ホスト名 -->
+                <div class="mb-3">
+                    <label for="hostInput" class="form-label fw-semibold">
+                        <i class="bi bi-globe2 me-1"></i>
+                        <span th:text="#{setup.step2.label.host}">ホスト名</span>
+                        <span class="text-danger">*</span>
+                    </label>
+                    <input type="text"
+                           id="hostInput"
+                           th:field="*{host}"
+                           class="form-control"
+                           th:classappend="${#fields.hasErrors('host')} ? 'is-invalid' : ''"
+                           th:placeholder="#{setup.step2.placeholder.host}"
+                           required/>
+                    <div class="form-text" th:text="#{setup.step2.help.host}">
+                        KizuLogが運用されるドメイン名を入力してください。
+                    </div>
+                    <div class="invalid-feedback"
+                         th:if="${#fields.hasErrors('host')}"
+                         th:errors="*{host}">エラー</div>
+                </div>
+
+                <hr class="my-4"/>
+
                 <div class="border rounded p-3 mb-3 bg-light">
                     <h6 class="mb-3">
                         <i class="bi bi-key me-1"></i>OIDC
@@ -53,10 +93,11 @@
                             <span class="text-danger">*</span>
                         </label>
                         <div class="input-group">
-                            <input type="url" class="form-control"
-                                   name="oidcSetting.uri"
+                            <input type="url"
+                                   th:field="*{oidcSetting.uri}"
                                    id="oidcUri"
-                                   th:value="${sessionData.oidcSettings != null and !sessionData.oidcSettings.isEmpty() ? sessionData.oidcSettings[0].uri : ''}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('oidcSetting.uri')} ? 'is-invalid' : ''"
                                    th:placeholder="#{setup.step2.placeholder.uri}"
                                    required/>
                             <button type="button" class="btn btn-outline-secondary"
@@ -67,27 +108,39 @@
                             </button>
                         </div>
                         <div id="oidcResult" class="mt-1 small"></div>
+                        <div class="invalid-feedback d-block"
+                             th:if="${#fields.hasErrors('oidcSetting.uri')}"
+                             th:errors="*{oidcSetting.uri}">エラー</div>
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-semibold">
                             <span th:text="#{setup.step2.label.clientId}"></span>
                             <span class="text-danger">*</span>
                         </label>
-                        <input type="text" class="form-control"
-                               name="oidcSetting.clientId"
-                               th:value="${sessionData.oidcSettings != null and !sessionData.oidcSettings.isEmpty() ? sessionData.oidcSettings[0].clientId : ''}"
+                        <input type="text"
+                               th:field="*{oidcSetting.clientId}"
+                               class="form-control"
+                               th:classappend="${#fields.hasErrors('oidcSetting.clientId')} ? 'is-invalid' : ''"
                                th:placeholder="#{setup.step2.placeholder.clientId}"
                                required/>
+                        <div class="invalid-feedback"
+                             th:if="${#fields.hasErrors('oidcSetting.clientId')}"
+                             th:errors="*{oidcSetting.clientId}">エラー</div>
                     </div>
                     <div class="mb-0">
                         <label class="form-label fw-semibold">
                             <span th:text="#{setup.step2.label.clientSecret}"></span>
                             <span class="text-danger">*</span>
                         </label>
-                        <input type="password" class="form-control"
-                               name="oidcSetting.clientSecret"
+                        <input type="password"
+                               th:field="*{oidcSetting.clientSecret}"
+                               class="form-control"
+                               th:classappend="${#fields.hasErrors('oidcSetting.clientSecret')} ? 'is-invalid' : ''"
                                th:placeholder="#{setup.step2.placeholder.clientSecret}"
                                required/>
+                        <div class="invalid-feedback"
+                             th:if="${#fields.hasErrors('oidcSetting.clientSecret')}"
+                             th:errors="*{oidcSetting.clientSecret}">エラー</div>
                     </div>
                 </div>
 
@@ -98,7 +151,7 @@
                     </a>
                     <button type="submit" class="btn btn-primary px-4"
                             id="nextBtn"
-                            th:disabled="${sessionData.oidcSettings == null or sessionData.oidcSettings.isEmpty() or sessionData.oidcSettings[0].uri == null}">
+                            disabled>
                         <span th:text="#{setup.button.next}"></span>
                         <i class="bi bi-arrow-right ms-1"></i>
                     </button>
@@ -117,8 +170,8 @@
         errorUnexpected: /*[[#{oidc.error.unexpected}]]*/ ''
     };
 
-    // 既存のOIDC設定がある場合は接続確認済みとして扱う
-    const existingUri = /*[[${sessionData.oidcSettings != null and !sessionData.oidcSettings.isEmpty() ? sessionData.oidcSettings[0].uri : ''}]]*/ '';
+    // 既存のOIDC設定がある（=以前確認済み）場合は接続確認済みとして扱う
+    const existingUri = /*[[${step2FormData.oidcSetting != null and step2FormData.oidcSetting.uri != null ? step2FormData.oidcSetting.uri : ''}]]*/ '';
     if (existingUri) {
         document.getElementById('nextBtn').disabled = false;
         document.getElementById('oidcResult').innerHTML =

@@ -7,16 +7,11 @@ import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.Optional;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
-import io.github.kizulog_community.kizulog.domain.systemconfig.service.SystemConfigService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -28,7 +23,7 @@ import jakarta.servlet.http.HttpServletResponse;
  */
 class SetupCheckFilterTest {
 
-    private SystemConfigService systemConfigService;
+    private SystemOidcProviderRepository systemOidcProviderRepository;
     private SetupCheckFilter filter;
     private HttpServletRequest request;
     private HttpServletResponse response;
@@ -36,34 +31,20 @@ class SetupCheckFilterTest {
 
     @BeforeEach
     void setUp() {
-        systemConfigService = mock(SystemConfigService.class);
-        filter = new SetupCheckFilter(systemConfigService);
+        systemOidcProviderRepository = mock(SystemOidcProviderRepository.class);
+        filter = new SetupCheckFilter(systemOidcProviderRepository);
         request = mock(HttpServletRequest.class);
         response = mock(HttpServletResponse.class);
         chain = mock(FilterChain.class);
         when(request.getContextPath()).thenReturn("");
     }
 
-    /**
-     * セットアップ完了状態のSystemConfigを返すモックを設定
-     */
     private void mockSetupCompleted() {
-        SystemConfig config = new SystemConfig(
-                "OIDC",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "[{\"id\":\"master\"}]",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "test-user");
-        when(systemConfigService.findLatestByKey("OIDC"))
-                .thenReturn(Optional.of(config));
+        when(systemOidcProviderRepository.existsAny()).thenReturn(true);
     }
 
-    /**
-     * セットアップ未完了状態（OIDC設定なし）のモックを設定
-     */
     private void mockSetupNotCompleted() {
-        when(systemConfigService.findLatestByKey("OIDC"))
-                .thenReturn(Optional.empty());
+        when(systemOidcProviderRepository.existsAny()).thenReturn(false);
     }
 
     @Test
@@ -74,7 +55,7 @@ class SetupCheckFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(chain).doFilter(request, response);
-        verify(systemConfigService, never()).findLatestByKey(anyString());
+        verify(systemOidcProviderRepository, never()).existsAny();
     }
 
     @Test
@@ -154,6 +135,18 @@ class SetupCheckFilterTest {
     }
 
     @Test
+    @DisplayName("セットアップ完了で /setup/step0 へのアクセスもFORBIDDENを返す")
+    void doFilter_setupCompleted_step0Path_returnsForbidden() throws Exception {
+        mockSetupCompleted();
+        when(request.getRequestURI()).thenReturn("/setup/step0");
+
+        filter.doFilter(request, response, chain);
+
+        verify(response).sendError(eq(HttpServletResponse.SC_FORBIDDEN));
+        verify(chain, never()).doFilter(request, response);
+    }
+
+    @Test
     @DisplayName("セットアップ完了で /setup/ 以外のパスはchainを呼ぶ")
     void doFilter_setupCompleted_nonSetupPath_callsChain() throws Exception {
         mockSetupCompleted();
@@ -166,42 +159,6 @@ class SetupCheckFilterTest {
     }
 
     @Test
-    @DisplayName("OIDC設定が空配列の場合はセットアップ未完了と判定")
-    void doFilter_oidcEmptyArray_treatedAsNotCompleted() throws Exception {
-        SystemConfig config = new SystemConfig(
-                "OIDC",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "[]",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "test-user");
-        when(systemConfigService.findLatestByKey("OIDC"))
-                .thenReturn(Optional.of(config));
-        when(request.getRequestURI()).thenReturn("/dashboard");
-
-        filter.doFilter(request, response, chain);
-
-        verify(response).sendRedirect("/setup/step0");
-    }
-
-    @Test
-    @DisplayName("OIDC設定の値が空文字の場合はセットアップ未完了と判定")
-    void doFilter_oidcEmptyString_treatedAsNotCompleted() throws Exception {
-        SystemConfig config = new SystemConfig(
-                "OIDC",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "",
-                OffsetDateTime.now(ZoneOffset.UTC),
-                "test-user");
-        when(systemConfigService.findLatestByKey("OIDC"))
-                .thenReturn(Optional.of(config));
-        when(request.getRequestURI()).thenReturn("/dashboard");
-
-        filter.doFilter(request, response, chain);
-
-        verify(response).sendRedirect("/setup/step0");
-    }
-
-    @Test
     @DisplayName("コンテキストパスがある場合は /context/setup/step0 にリダイレクト")
     void doFilter_withContextPath_redirectsCorrectly() throws Exception {
         when(request.getContextPath()).thenReturn("/context");
@@ -211,6 +168,17 @@ class SetupCheckFilterTest {
         filter.doFilter(request, response, chain);
 
         verify(response).sendRedirect("/context/setup/step0");
+    }
+
+    @Test
+    @DisplayName("セットアップ完了でも /setup/complete はchainを呼ぶ")
+    void doFilter_setupCompleted_completePath_callsChain() throws Exception {
+        when(request.getRequestURI()).thenReturn("/setup/complete");
+
+        filter.doFilter(request, response, chain);
+
+        verify(chain).doFilter(request, response);
+        verify(systemOidcProviderRepository, never()).existsAny();
     }
 
 }

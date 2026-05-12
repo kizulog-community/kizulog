@@ -1,11 +1,10 @@
 package io.github.kizulog_community.kizulog.infrastructure.security.client;
 
 import java.time.OffsetDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.ConcurrentHashMap;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,23 +13,22 @@ import org.springframework.security.oauth2.client.registration.ClientRegistratio
 import org.springframework.security.oauth2.client.registration.ClientRegistrations;
 import org.springframework.stereotype.Component;
 
-import io.github.kizulog_community.kizulog.domain.systemauth.model.SystemOidcSetting;
-import io.github.kizulog_community.kizulog.domain.systemauth.model.SystemOidcSettings;
-import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemOidcSettingService;
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
 import lombok.RequiredArgsConstructor;
 
 /**
  * システム管理用ClientRegistrationリポジトリ
  *
  * <p>Spring SecurityのOAuth2Loginが認可リクエストを発行する際に呼び出され、
- * system_configに保存されたOIDC設定をもとに ClientRegistration を動的に構築する。</p>
+ * system_oidc_providersに登録されたOIDC設定をもとに ClientRegistration を動的に構築する。</p>
  *
  * <p>OIDCディスカバリは既存の OidcProviderService#getMetadata(String) 経由するため、
  * localプロファイルでの自己署名証明書サポート LocalRestClientConfig がそのまま適用される。</p>
  *
- * <p>system_config.versionをキーとしたキャッシュを保持し、設定変更時には自動的に再構築する。
- * バージョンが一致する間は同一の ClientRegistration インスタンスを返却する。</p>
+ * <p>provider_id毎のキャッシュを保持し、設定のversionが変わった際には自動的に再構築する。
+ * 同一provider_id・同一versionの間は同一の ClientRegistration インスタンスを返却する。</p>
  *
  * @author Jun Kobayashi
  */
@@ -39,104 +37,84 @@ import lombok.RequiredArgsConstructor;
 public class DynamicSystemClientRegistrationRepository
         implements ClientRegistrationRepository {
 
-    /** システム管理OIDCに対応するregistrationId */
-    public static final String SYSTEM_REGISTRATION_ID = "master";
-
     /** ロガー */
     private static final Logger log =
             LoggerFactory.getLogger(DynamicSystemClientRegistrationRepository.class);
 
-    /** OIDC設定サービス */
-    private final SystemOidcSettingService systemOidcSettingService;
+    /** OIDCプロバイダーサービス */
+    private final SystemOidcProviderService systemOidcProviderService;
 
-    /** OIDCプロバイダーサービス（メタデータ取得） */
+    /** OIDCプロバイダーメタデータサービス */
     private final OidcProviderService oidcProviderService;
 
-    /** バージョン付きClientRegistrationキャッシュ */
-    private final AtomicReference<CacheEntry> cacheRef = new AtomicReference<>();
+    /** provider_id毎のキャッシュ (キー: provider_id, 値: バージョン付きキャッシュエントリ) */
+    private final ConcurrentHashMap<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
     /**
      * registrationIdに対応するClientRegistrationを返す。
      *
-     * <p>"master"以外、または設定が存在しない場合はnullを返す。
+     * <p>registrationIdがprovider_idとして扱われ、ENABLEDな設定が見つかった場合のみ
+     * ClientRegistrationを返す。見つからなかった場合（未登録・DISABLED含む）はnullを返す。
      * Spring Securityフレームワーク側でnullを受け取ると404相当のエラーとなる。</p>
      *
-     * @param registrationId 登録ID
+     * @param registrationId 登録ID（provider_idとして扱う）
      * @return ClientRegistration、該当なしの場合はnull
      */
     @Override
     public ClientRegistration findByRegistrationId(String registrationId) {
-        if (!SYSTEM_REGISTRATION_ID.equals(registrationId)) {
+        if (registrationId == null) {
             return null;
         }
 
-        Optional<SystemOidcSettings> opt = systemOidcSettingService.findLatest();
+        Optional<DecryptedOidcProvider> opt =
+                systemOidcProviderService.findEnabledForAuthentication(registrationId);
         if (opt.isEmpty()) {
-            log.warn("システム管理OIDC設定が未登録です。セットアップが完了していない可能性があります。");
+            log.warn("有効なシステムOIDCプロバイダーが見つかりません。registrationId={}",
+                    registrationId);
             return null;
         }
 
-        SystemOidcSettings settings = opt.get();
-        SystemOidcSetting target = findById(settings.getSettings(), SYSTEM_REGISTRATION_ID);
-        if (target == null) {
-            log.warn("システム管理OIDC設定にid='{}'の設定が見つかりません。", SYSTEM_REGISTRATION_ID);
-            return null;
-        }
-
-        return getCachedOrBuild(settings.getVersion(), target);
-    }
-
-    /**
-     * idに一致するOIDC設定を返す。
-     *
-     * @param settings OIDC設定リスト
-     * @param id 探すid
-     * @return 該当する設定、なければnull
-     */
-    private SystemOidcSetting findById(List<SystemOidcSetting> settings, String id) {
-        for (SystemOidcSetting s : settings) {
-            if (id.equals(s.getId())) {
-                return s;
-            }
-        }
-        return null;
+        return getCachedOrBuild(opt.get());
     }
 
     /**
      * キャッシュから取得、なければ構築してキャッシュする。
      *
-     * @param version バージョン
-     * @param setting OIDC設定
+     * <p>provider_id毎にキャッシュし、versionが一致する間は同一インスタンスを返す。
+     * versionが変わったら再構築してキャッシュを置き換える。</p>
+     *
+     * @param provider 復号済みOIDCプロバイダー
      * @return ClientRegistration
      */
-    private ClientRegistration getCachedOrBuild(
-            OffsetDateTime version, SystemOidcSetting setting) {
-        CacheEntry current = cacheRef.get();
-        if (current != null && current.version.equals(version)) {
+    private ClientRegistration getCachedOrBuild(DecryptedOidcProvider provider) {
+        CacheEntry current = cache.get(provider.getProviderId());
+        if (current != null && current.version.equals(provider.getVersion())) {
             return current.registration;
         }
-        ClientRegistration registration = buildClientRegistration(setting);
-        cacheRef.set(new CacheEntry(version, registration));
-        log.info("システム管理ClientRegistrationを再構築しました。version={}", version);
+
+        ClientRegistration registration = buildClientRegistration(provider);
+        cache.put(provider.getProviderId(), new CacheEntry(provider.getVersion(), registration));
+        log.info("システムClientRegistrationを構築しました。providerId={}, version={}",
+                provider.getProviderId(), provider.getVersion());
         return registration;
     }
 
     /**
-     * OIDC設定からClientRegistrationを構築する。
+     * 復号済みOIDCプロバイダーからClientRegistrationを構築する。
      *
      * <p>既存の OidcProviderService でメタデータを取得し、
      * Spring Securityの ClientRegistrations.fromOidcConfiguration で
      * ClientRegistrationを生成する。</p>
      *
-     * @param setting OIDC設定
+     * @param provider 復号済みOIDCプロバイダー
      * @return 構築済みClientRegistration
      */
-    private ClientRegistration buildClientRegistration(SystemOidcSetting setting) {
-        Map<String, Object> metadata = oidcProviderService.getMetadata(setting.getUri());
+    private ClientRegistration buildClientRegistration(DecryptedOidcProvider provider) {
+        Map<String, Object> metadata = oidcProviderService.getMetadata(provider.getUri());
         return ClientRegistrations.fromOidcConfiguration(metadata)
-                .registrationId(SYSTEM_REGISTRATION_ID)
-                .clientId(setting.getClientId())
-                .clientSecret(setting.getClientSecret())
+                .registrationId(provider.getProviderId())
+                .clientId(provider.getClientId())
+                .clientSecret(provider.getClientSecret())
                 .scope("openid")
                 .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
                 .build();

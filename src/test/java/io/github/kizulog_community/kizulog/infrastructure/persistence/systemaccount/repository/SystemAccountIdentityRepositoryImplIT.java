@@ -16,10 +16,13 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 import org.springframework.context.annotation.Import;
 
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.AbstractRepositoryIT;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountIdentityEntity;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountIdentityId;
+import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountIdentityStatusEntity;
+import io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.entity.SystemAccountIdentityStatusId;
 
 /**
  * SystemAccountIdentityRepositoryImpl の統合テスト
@@ -39,18 +42,20 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
     @Autowired
     private SystemAccountIdentityJpaRepository jpaRepository;
 
+    /** identity_status投入用 JPAリポジトリ (countActiveByIss テスト用) */
+    @Autowired
+    private SystemAccountIdentityStatusJpaRepository statusJpaRepository;
+
     /** テスト用基準時刻（UTC） */
     private static final OffsetDateTime BASE_TIME =
             OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
     @BeforeEach
     void setUp() {
+        statusJpaRepository.deleteAll();
         jpaRepository.deleteAll();
     }
 
-    /**
-     * テストデータ投入ヘルパー（JPA直接保存）
-     */
     private void saveEntity(
             String identityId, OffsetDateTime version,
             String accountId, String iss, String aud, String sub, String createdBy) {
@@ -59,10 +64,6 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
                 accountId, iss, aud, sub, version, createdBy);
         jpaRepository.save(entity);
     }
-
-    // ========================================================================
-    // findLatestByIssAndAudAndSub
-    // ========================================================================
 
     @Test
     @DisplayName("findLatestByIssAndAudAndSub: 同一identityで複数versionが存在する場合、最大versionを返す")
@@ -144,10 +145,6 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
         assertThat(result.get().getIdentityId()).isEqualTo("id-1");
     }
 
-    // ========================================================================
-    // findLatestByIdentityId
-    // ========================================================================
-
     @Test
     @DisplayName("findLatestByIdentityId: 同一identity_idで複数versionが存在する場合、最大versionを返す")
     void findLatestByIdentityId_returnsLatestVersion() {
@@ -178,10 +175,6 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
         // then
         assertThat(result).isEmpty();
     }
-
-    // ========================================================================
-    // findLatestByAccountId
-    // ========================================================================
 
     @Test
     @DisplayName("findLatestByAccountId: 1アカウントに複数identityがある場合、各identityの最新版を全て返す")
@@ -226,10 +219,6 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
         // then
         assertThat(result).isEmpty();
     }
-
-    // ========================================================================
-    // save
-    // ========================================================================
 
     @Test
     @DisplayName("save: 新規レコードを保存できる")
@@ -286,6 +275,88 @@ class SystemAccountIdentityRepositoryImplIT extends AbstractRepositoryIT {
         assertThat(loaded.get().getSub()).isEqualTo("sub-value");
         assertThat(loaded.get().getCreatedAt()).isEqualTo(BASE_TIME);
         assertThat(loaded.get().getCreatedBy()).isEqualTo("system:test");
+    }
+
+    @Test
+    @DisplayName("countActiveByIss: 該当issを持つACTIVEなidentity数を返す")
+    void countActiveByIss_returnsCountOfActiveIdentities() {
+        String iss = "https://auth.example/realms/master";
+        saveEntity("id-A", BASE_TIME, "acc-1", iss, "aud-A", "sub-A", "u1");
+        saveStatus("id-A", BASE_TIME, AccountStatus.ACTIVE, "u1");
+        saveEntity("id-B", BASE_TIME, "acc-2", iss, "aud-B", "sub-B", "u2");
+        saveStatus("id-B", BASE_TIME, AccountStatus.ACTIVE, "u2");
+        saveEntity("id-C", BASE_TIME, "acc-3", iss, "aud-C", "sub-C", "u3");
+        saveStatus("id-C", BASE_TIME, AccountStatus.INACTIVE, "u3");
+        saveEntity("id-D", BASE_TIME, "acc-4", "https://other.example", "aud-D", "sub-D", "u4");
+        saveStatus("id-D", BASE_TIME, AccountStatus.ACTIVE, "u4");
+
+        int count = sut.countActiveByIss(iss);
+
+        assertThat(count).isEqualTo(2);
+    }
+
+    @Test
+    @DisplayName("countActiveByIss: 該当issを持つidentityが存在しない場合、0を返す")
+    void countActiveByIss_returnsZero_whenNoMatch() {
+        saveEntity("id-1", BASE_TIME, "acc-1",
+                "https://other.example", "aud", "sub", "u");
+        saveStatus("id-1", BASE_TIME, AccountStatus.ACTIVE, "u");
+
+        int count = sut.countActiveByIss("https://not-exist.example");
+
+        assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName("countActiveByIss: テーブルが空の場合、0を返す")
+    void countActiveByIss_returnsZero_whenTableEmpty() {
+        int count = sut.countActiveByIss("https://auth.example/realms/master");
+
+        assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName("countActiveByIss: 過去ACTIVEだが最新がINACTIVEのidentityはカウントされない")
+    void countActiveByIss_excludesPastActiveIfLatestIsInactive() {
+        String iss = "https://auth.example/realms/master";
+        OffsetDateTime v1 = BASE_TIME;
+        OffsetDateTime v2 = BASE_TIME.plusHours(1);
+
+        saveEntity("id-A", v1, "acc-1", iss, "aud", "sub", "u1");
+        saveStatus("id-A", v1, AccountStatus.ACTIVE, "u1");
+        saveStatus("id-A", v2, AccountStatus.INACTIVE, "u2");
+
+        int count = sut.countActiveByIss(iss);
+
+        assertThat(count).isZero();
+    }
+
+    @Test
+    @DisplayName("countActiveByIss: 過去INACTIVEだが最新がACTIVEのidentityはカウントされる")
+    void countActiveByIss_includesIfLatestIsActive() {
+        String iss = "https://auth.example/realms/master";
+        OffsetDateTime v1 = BASE_TIME;
+        OffsetDateTime v2 = BASE_TIME.plusHours(1);
+
+        saveEntity("id-A", v1, "acc-1", iss, "aud", "sub", "u1");
+        saveStatus("id-A", v1, AccountStatus.INACTIVE, "u1");
+        saveStatus("id-A", v2, AccountStatus.ACTIVE, "u2");
+
+        int count = sut.countActiveByIss(iss);
+
+        assertThat(count).isEqualTo(1);
+    }
+
+    /**
+     * identity_status を直接JPA経由で投入する。
+     */
+    private void saveStatus(
+            String identityId, OffsetDateTime version,
+            AccountStatus status, String createdBy) {
+        SystemAccountIdentityStatusEntity entity = new SystemAccountIdentityStatusEntity(
+                new SystemAccountIdentityStatusId(identityId, version),
+                status, null, version, createdBy);
+        statusJpaRepository.save(entity);
     }
 
 }

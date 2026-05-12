@@ -3,7 +3,8 @@ package io.github.kizulog_community.kizulog.config;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import io.github.kizulog_community.kizulog.domain.systemconfig.service.SystemConfigService;
+
+import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.SetupCheckFilter;
 import lombok.RequiredArgsConstructor;
 
@@ -16,8 +17,8 @@ import lombok.RequiredArgsConstructor;
 @RequiredArgsConstructor
 public class FilterConfig {
 
-    /** システム設定サービス */
-    private final SystemConfigService systemConfigService;
+    /** OIDCプロバイダーリポジトリ */
+    private final SystemOidcProviderRepository systemOidcProviderRepository;
 
     /**
      * セットアップチェックフィルターの登録
@@ -26,7 +27,7 @@ public class FilterConfig {
      */
     @Bean
     FilterRegistrationBean<SetupCheckFilter> setupCheckFilterRegistration() {
-        SetupCheckFilter filter = new SetupCheckFilter(systemConfigService);
+        SetupCheckFilter filter = new SetupCheckFilter(systemOidcProviderRepository);
         FilterRegistrationBean<SetupCheckFilter> registration =
                 new FilterRegistrationBean<>(filter);
         registration.addUrlPatterns("/*");

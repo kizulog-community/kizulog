@@ -65,4 +65,27 @@ public interface SystemAccountIdentityJpaRepository
     List<SystemAccountIdentityEntity> findLatestByAccountId(
             @Param("accountId") String accountId);
 
+    /**
+     * 指定したIssuer URIに紐付くACTIVEなidentityの件数を取得する。
+     *
+     * <p>identity の最新versionでissが一致 かつ identity_statusの
+     * 最新versionがACTIVEなものを集計する。</p>
+     */
+    @Query("SELECT COUNT(e) FROM SystemAccountIdentityEntity e "
+            + "WHERE e.iss = :iss "
+            + "AND e.id.version = ("
+            + "    SELECT MAX(e2.id.version) FROM SystemAccountIdentityEntity e2 "
+            + "    WHERE e2.id.identityId = e.id.identityId"
+            + ") "
+            + "AND EXISTS ("
+            + "    SELECT 1 FROM SystemAccountIdentityStatusEntity s "
+            + "    WHERE s.id.identityId = e.id.identityId "
+            + "    AND s.status = io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus.ACTIVE "
+            + "    AND s.id.version = ("
+            + "        SELECT MAX(s2.id.version) FROM SystemAccountIdentityStatusEntity s2 "
+            + "        WHERE s2.id.identityId = e.id.identityId"
+            + "    )"
+            + ")")
+    int countActiveByIss(@Param("iss") String iss);
+
 }

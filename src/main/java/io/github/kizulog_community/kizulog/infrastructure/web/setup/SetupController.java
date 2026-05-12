@@ -1,5 +1,6 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
@@ -12,6 +13,7 @@ import org.springframework.context.i18n.SimpleLocaleContext;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -20,7 +22,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseBody;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 
@@ -32,12 +33,11 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProvi
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
 /**
  * セットアップウィザードコントローラー
- *
- * <p>セットアップウィザードの画面遷移とフォーム処理を担う。</p>
  *
  * @author Jun Kobayashi
  */
@@ -74,21 +74,32 @@ public class SetupController {
     public String step0(Model model) {
         model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
         model.addAttribute("sessionData", setupSessionData);
+        if (!model.containsAttribute("step0FormData")) {
+            Step0FormData formData = new Step0FormData();
+            if (setupSessionData.getSetupLanguage() != null) {
+                formData.setLanguage(setupSessionData.getSetupLanguage());
+            }
+            model.addAttribute("step0FormData", formData);
+        }
         return "setup/step0";
     }
 
     /**
      * Step0：言語選択を受け取りStep1へ遷移
-     *
-     * @param language 選択された言語
-     * @param request HTTPリクエスト
-     * @param response HTTPレスポンス
-     * @return Step1へリダイレクト
      */
     @PostMapping("/step0")
     public String step0Submit(
-            @RequestParam SupportedLanguage language,
-            HttpServletRequest request, HttpServletResponse response) {
+            @Valid @ModelAttribute("step0FormData") Step0FormData formData,
+            BindingResult bindingResult,
+            HttpServletRequest request,
+            HttpServletResponse response,
+            Model model) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
+            model.addAttribute("sessionData", setupSessionData);
+            return "setup/step0";
+        }
+        SupportedLanguage language = formData.getLanguage();
         setupSessionData.setSetupLanguage(language);
         localeResolver.setLocaleContext(
                 request, response,
@@ -98,9 +109,6 @@ public class SetupController {
 
     /**
      * Step1：デフォルト設定画面を表示
-     *
-     * @param model モデル
-     * @return Step1テンプレート
      */
     @GetMapping("/step1")
     public String step1(Model model) {
@@ -110,49 +118,61 @@ public class SetupController {
         model.addAttribute("sessionData", setupSessionData);
         model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
 
-        // タイムゾーン全件をList<Map>として渡す（Thymeleafが自動的にJSオブジェクトに変換）
         List<Map<String, String>> tzList = SupportedTimezone.values().stream()
                 .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
                 .toList();
         model.addAttribute("timezonesJson", tzList);
 
-        // 選択済みタイムゾーン
         List<Map<String, String>> selectedTzList = setupSessionData.getAvailableTimezones().stream()
                 .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
                 .toList();
         model.addAttribute("selectedTimezones", selectedTzList);
+
+        if (!model.containsAttribute("step1FormData")) {
+            Step1FormData formData = new Step1FormData();
+            if (setupSessionData.getDefaultLanguage() != null) {
+                formData.setDefaultLanguage(setupSessionData.getDefaultLanguage());
+            }
+            if (setupSessionData.getAvailableLanguages() != null) {
+                formData.setAvailableLanguages(
+                        new ArrayList<>(setupSessionData.getAvailableLanguages()));
+            }
+            if (setupSessionData.getDefaultTimezone() != null) {
+                formData.setDefaultTimezone(setupSessionData.getDefaultTimezone());
+            }
+            if (setupSessionData.getAvailableTimezones() != null) {
+                formData.setAvailableTimezones(
+                        new ArrayList<>(setupSessionData.getAvailableTimezones()));
+            }
+            model.addAttribute("step1FormData", formData);
+        }
 
         return "setup/step1";
     }
 
     /**
      * Step1：デフォルト設定を受け取りStep2へ遷移
-     *
-     * @param formData フォームデータ
-     * @return Step2へリダイレクト
      */
     @PostMapping("/step1")
     public String step1Submit(
-    @ModelAttribute Step1FormData formData, RedirectAttributes redirectAttributes) {
-        if (formData.getAvailableLanguages() == null
-                || formData.getAvailableLanguages().isEmpty()) {
-            redirectAttributes.addFlashAttribute("error", "validation.availableLanguages.empty");
-            return "redirect:/setup/step1";
-        }
-        if (formData.getAvailableTimezones() == null
-                || formData.getAvailableTimezones().isEmpty()) {
-            redirectAttributes.addFlashAttribute("error", "validation.availableTimezones.empty");
-            return "redirect:/setup/step1";
-        }
-        if (formData.getDefaultLanguage() == null
-                || !formData.getAvailableLanguages().contains(formData.getDefaultLanguage())) {
-            redirectAttributes.addFlashAttribute("error", "validation.defaultLanguage.invalid");
-            return "redirect:/setup/step1";
-        }
-        if (formData.getDefaultTimezone() == null
-                || !formData.getAvailableTimezones().contains(formData.getDefaultTimezone())) {
-            redirectAttributes.addFlashAttribute("error", "validation.defaultTimezone.invalid");
-            return "redirect:/setup/step1";
+            @Valid @ModelAttribute("step1FormData") Step1FormData formData,
+            BindingResult bindingResult,
+            Model model) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("sessionData", setupSessionData);
+            model.addAttribute("languages", Arrays.asList(SupportedLanguage.values()));
+            List<Map<String, String>> tzList = SupportedTimezone.values().stream()
+                    .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
+                    .toList();
+            model.addAttribute("timezonesJson", tzList);
+            List<SupportedTimezone> currentTz = formData.getAvailableTimezones() != null
+                    ? formData.getAvailableTimezones()
+                    : List.of();
+            List<Map<String, String>> selectedTzList = currentTz.stream()
+                    .map(tz -> Map.of("id", tz.getId(), "displayName", tz.getDisplayName()))
+                    .toList();
+            model.addAttribute("selectedTimezones", selectedTzList);
+            return "setup/step1";
         }
 
         setupSessionData.setDefaultLanguage(formData.getDefaultLanguage());
@@ -164,10 +184,6 @@ public class SetupController {
 
     /**
      * Step2：システム管理OIDC設定画面を表示
-     *
-     * @param model モデル
-     * @param request HTTPリクエスト
-     * @return Step2テンプレート
      */
     @GetMapping("/step2")
     public String step2(Model model, HttpServletRequest request) {
@@ -178,20 +194,57 @@ public class SetupController {
             setupSessionData.getOidcSettings().add(new OidcSetting());
         }
         model.addAttribute("sessionData", setupSessionData);
+
+        if (!model.containsAttribute("step2FormData")) {
+            Step2FormData formData = new Step2FormData();
+            formData.setHost(setupSessionData.getHost());
+            // セッションから既存OIDC設定を復元
+            OidcSetting existing = setupSessionData.getOidcSettings().get(0);
+            OidcSetting form = new OidcSetting();
+            form.setUri(existing.getUri());
+            form.setClientId(existing.getClientId());
+            form.setClientSecret(existing.getClientSecret());
+            formData.setOidcSetting(form);
+            model.addAttribute("step2FormData", formData);
+        }
+
         return "setup/step2";
     }
 
     /**
      * Step2：OIDC設定を受け取りStep3へ遷移
-     *
-     * @param formData フォームデータ
-     * @return Step3へリダイレクト
      */
     @PostMapping("/step2")
-    public String step2Submit(@ModelAttribute Step2FormData formData) {
+    public String step2Submit(
+            @Valid @ModelAttribute("step2FormData") Step2FormData formData,
+            BindingResult bindingResult,
+            Locale locale,
+            Model model) {
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("sessionData", setupSessionData);
+            return "setup/step2";
+        }
+
+        // サーバー側でもOIDC接続確認を実施
+        try {
+            oidcProviderService.verify(formData.getOidcSetting().getUri());
+        } catch (OidcConnectionException e) {
+            log.warn("Step2 OIDC接続確認失敗: uri={}, errorType={}",
+                    formData.getOidcSetting().getUri(), e.getErrorType());
+            String messageKey = switch (e.getErrorType()) {
+                case INPUT_ERROR -> "oidc.error.input";
+                case CONNECTION_ERROR -> "oidc.error.connection";
+                case INVALID_RESPONSE -> "oidc.error.invalid_response";
+                case UNEXPECTED_ERROR -> "oidc.error.unexpected";
+            };
+            String errMsg = messageSource.getMessage(messageKey, null, locale);
+            bindingResult.reject("oidc.connection.failed", errMsg);
+            model.addAttribute("sessionData", setupSessionData);
+            return "setup/step2";
+        }
+
         setupSessionData.setHost(formData.getHost());
 
-        // SYSTEM_TENANTのOIDC識別子は'master'固定
         OidcSetting oidcSetting = formData.getOidcSetting();
         oidcSetting.setId("master");
 
@@ -202,9 +255,6 @@ public class SetupController {
 
     /**
      * Step3：管理者OIDCログイン画面を表示
-     *
-     * @param model モデル
-     * @return Step3テンプレート
      */
     @GetMapping("/step3")
     public String step3(Model model) {
@@ -214,9 +264,6 @@ public class SetupController {
 
     /**
      * Step4：確認画面を表示
-     *
-     * @param model モデル
-     * @return Step4テンプレート
      */
     @GetMapping("/step4")
     public String step4(Model model) {
@@ -226,8 +273,6 @@ public class SetupController {
 
     /**
      * Step4：設定を保存して完了画面へ遷移
-     *
-     * @return 完了画面へリダイレクト
      */
     @PostMapping("/step4")
     public String step4Submit() {
@@ -237,8 +282,6 @@ public class SetupController {
 
     /**
      * 完了画面を表示
-     *
-     * @return 完了テンプレート
      */
     @GetMapping("/complete")
     public String complete() {
@@ -247,10 +290,6 @@ public class SetupController {
 
     /**
      * OIDC接続確認
-     *
-     * @param request リクエストボディ（issuerUri）
-     * @param locale ロケール
-     * @return 接続確認結果
      */
     @PostMapping("/check-oidc")
     @ResponseBody
@@ -276,12 +315,6 @@ public class SetupController {
 
     /**
      * OIDCログイン
-     *
-     * <p>Step2で設定したOIDCプロバイダーの認証URLへリダイレクトする。</p>
-     *
-     * @param request HTTPリクエスト
-     * @param session HTTPセッション
-     * @return OIDCプロバイダーへリダイレクト
      */
     @GetMapping("/oidc-login")
     public String oidcLogin(HttpServletRequest request, HttpSession session) {
@@ -308,13 +341,6 @@ public class SetupController {
 
     /**
      * OIDCコールバック
-     *
-     * <p>OIDCプロバイダーからの認可コードを受け取りIDトークンに交換する。</p>
-     *
-     * @param code 認可コード
-     * @param state stateパラメーター
-     * @param session HTTPセッション
-     * @return Step3へリダイレクト
      */
     @GetMapping("/callback")
     public String oidcCallback(

@@ -20,9 +20,11 @@ import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.context.MessageSource;
 import org.springframework.http.ResponseEntity;
+import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
+import org.springframework.validation.BeanPropertyBindingResult;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.servlet.i18n.SessionLocaleResolver;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import com.nimbusds.jwt.JWTClaimsSet;
 
@@ -67,46 +69,78 @@ class SetupControllerTest {
                 oidcProviderService);
     }
 
-    // ============================================================
-    // Step0
-    // ============================================================
     @Test
     @DisplayName("step0()はステップ0テンプレートを返す")
     void step0_returnsTemplate() {
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
         String view = controller.step0(model);
         assertThat(view).isEqualTo("setup/step0");
     }
 
     @Test
-    @DisplayName("step0()はモデルにlanguagesとsessionDataを設定する")
+    @DisplayName("step0()はモデルにlanguages/sessionData/step0FormDataを設定する")
     void step0_setsModelAttributes() {
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
         controller.step0(model);
-        verify(model).addAttribute(eq("languages"), any());
-        verify(model).addAttribute(eq("sessionData"), eq(setupSessionData));
+        assertThat(model.containsAttribute("languages")).isTrue();
+        assertThat(model.containsAttribute("sessionData")).isTrue();
+        assertThat(model.containsAttribute("step0FormData")).isTrue();
+        assertThat(model.getAttribute("step0FormData"))
+                .isInstanceOf(Step0FormData.class);
+    }
+
+    @Test
+    @DisplayName("step0()はセッションに既存言語があればformDataに復元する")
+    void step0_restoresExistingLanguageIntoFormData() {
+        setupSessionData.setSetupLanguage(SupportedLanguage.JA);
+        Model model = new ConcurrentModel();
+
+        controller.step0(model);
+
+        Step0FormData form = (Step0FormData) model.getAttribute("step0FormData");
+        assertThat(form.getLanguage()).isEqualTo(SupportedLanguage.JA);
     }
 
     @Test
     @DisplayName("step0Submit()はsetupLanguageを設定してstep1へリダイレクト")
     void step0Submit_setsLanguageAndRedirects() {
+        Step0FormData formData = new Step0FormData();
+        formData.setLanguage(SupportedLanguage.JA);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step0FormData");
         HttpServletRequest request = mock(HttpServletRequest.class);
         HttpServletResponse response = mock(HttpServletResponse.class);
+        Model model = new ConcurrentModel();
 
-        String view = controller.step0Submit(SupportedLanguage.JA, request, response);
+        String view = controller.step0Submit(formData, br, request, response, model);
 
         assertThat(view).isEqualTo("redirect:/setup/step1");
         assertThat(setupSessionData.getSetupLanguage()).isEqualTo(SupportedLanguage.JA);
         verify(localeResolver).setLocaleContext(eq(request), eq(response), any());
     }
 
-    // ============================================================
-    // Step1
-    // ============================================================
+    @Test
+    @DisplayName("step0Submit()でバリデーションエラーがあればstep0テンプレートを返す")
+    void step0Submit_bindingErrors_returnsTemplate() {
+        Step0FormData formData = new Step0FormData();
+        BindingResult br = new BeanPropertyBindingResult(formData, "step0FormData");
+        br.rejectValue("language", "required", "言語必須エラー");
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        HttpServletResponse response = mock(HttpServletResponse.class);
+        Model model = new ConcurrentModel();
+
+        String view = controller.step0Submit(formData, br, request, response, model);
+
+        assertThat(view).isEqualTo("setup/step0");
+        assertThat(setupSessionData.getSetupLanguage()).isNull();
+        verify(localeResolver, never()).setLocaleContext(any(), any(), any());
+        assertThat(model.containsAttribute("languages")).isTrue();
+        assertThat(model.containsAttribute("sessionData")).isTrue();
+    }
+
     @Test
     @DisplayName("step1()でsetupLanguageが未設定ならstep0へリダイレクト")
     void step1_languageNotSet_redirectsToStep0() {
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
         String view = controller.step1(model);
         assertThat(view).isEqualTo("redirect:/setup/step0");
     }
@@ -116,83 +150,77 @@ class SetupControllerTest {
     void step1_returnsTemplate() {
         setupSessionData.setSetupLanguage(SupportedLanguage.JA);
         setupSessionData.setAvailableTimezones(new ArrayList<>());
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
 
         String view = controller.step1(model);
 
         assertThat(view).isEqualTo("setup/step1");
-        verify(model).addAttribute(eq("sessionData"), eq(setupSessionData));
-        verify(model).addAttribute(eq("languages"), any());
-        verify(model).addAttribute(eq("timezonesJson"), any());
-        verify(model).addAttribute(eq("selectedTimezones"), any());
+        assertThat(model.containsAttribute("sessionData")).isTrue();
+        assertThat(model.containsAttribute("languages")).isTrue();
+        assertThat(model.containsAttribute("timezonesJson")).isTrue();
+        assertThat(model.containsAttribute("selectedTimezones")).isTrue();
+        assertThat(model.containsAttribute("step1FormData")).isTrue();
     }
 
     @Test
-    @DisplayName("step1Submit()で利用可能言語が空ならstep1にリダイレクト")
-    void step1Submit_emptyAvailableLanguages_redirectsToStep1() {
+    @DisplayName("step1()はセッションから既存設定をstep1FormDataに復元する")
+    void step1_restoresExistingSessionDataIntoFormData() {
+        setupSessionData.setSetupLanguage(SupportedLanguage.JA);
+        setupSessionData.setDefaultLanguage(SupportedLanguage.JA);
+        setupSessionData.setAvailableLanguages(
+                new ArrayList<>(List.of(SupportedLanguage.JA, SupportedLanguage.EN)));
+        setupSessionData.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        setupSessionData.setAvailableTimezones(
+                new ArrayList<>(List.of(SupportedTimezone.of("Asia/Tokyo"))));
+        Model model = new ConcurrentModel();
+
+        controller.step1(model);
+
+        Step1FormData form = (Step1FormData) model.getAttribute("step1FormData");
+        assertThat(form.getDefaultLanguage()).isEqualTo(SupportedLanguage.JA);
+        assertThat(form.getAvailableLanguages()).hasSize(2);
+        assertThat(form.getDefaultTimezone().getId()).isEqualTo("Asia/Tokyo");
+        assertThat(form.getAvailableTimezones()).hasSize(1);
+    }
+
+    @Test
+    @DisplayName("step1Submit()でバリデーションエラーがあればstep1テンプレートを返す")
+    void step1Submit_bindingErrors_returnsTemplate() {
         Step1FormData formData = new Step1FormData();
         formData.setAvailableLanguages(List.of());
         formData.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         formData.setDefaultLanguage(SupportedLanguage.JA);
         formData.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
-        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step1FormData");
+        br.rejectValue("availableLanguages", "empty", "利用可能言語が空");
+        Model model = new ConcurrentModel();
 
-        String view = controller.step1Submit(formData, redirectAttributes);
+        String view = controller.step1Submit(formData, br, model);
 
-        assertThat(view).isEqualTo("redirect:/setup/step1");
-        verify(redirectAttributes).addFlashAttribute(eq("error"),
-                eq("validation.availableLanguages.empty"));
+        assertThat(view).isEqualTo("setup/step1");
+        assertThat(setupSessionData.getDefaultLanguage()).isNull();
+        assertThat(model.containsAttribute("sessionData")).isTrue();
+        assertThat(model.containsAttribute("languages")).isTrue();
+        assertThat(model.containsAttribute("timezonesJson")).isTrue();
+        assertThat(model.containsAttribute("selectedTimezones")).isTrue();
     }
 
     @Test
-    @DisplayName("step1Submit()で利用可能タイムゾーンが空ならstep1にリダイレクト")
-    void step1Submit_emptyAvailableTimezones_redirectsToStep1() {
+    @DisplayName("step1Submit()でavailableTimezones=nullでも500にせずrenderできる")
+    void step1Submit_bindingErrorsWithNullTimezones_doesNotThrow() {
         Step1FormData formData = new Step1FormData();
         formData.setAvailableLanguages(List.of(SupportedLanguage.JA));
-        formData.setAvailableTimezones(List.of());
+        formData.setAvailableTimezones(null);
         formData.setDefaultLanguage(SupportedLanguage.JA);
-        formData.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
-        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+        formData.setDefaultTimezone(null);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step1FormData");
+        br.rejectValue("availableTimezones", "empty");
+        Model model = new ConcurrentModel();
 
-        String view = controller.step1Submit(formData, redirectAttributes);
+        String view = controller.step1Submit(formData, br, model);
 
-        assertThat(view).isEqualTo("redirect:/setup/step1");
-        verify(redirectAttributes).addFlashAttribute(eq("error"),
-                eq("validation.availableTimezones.empty"));
-    }
-
-    @Test
-    @DisplayName("step1Submit()でデフォルト言語が利用可能言語に含まれないとstep1にリダイレクト")
-    void step1Submit_invalidDefaultLanguage_redirectsToStep1() {
-        Step1FormData formData = new Step1FormData();
-        formData.setAvailableLanguages(List.of(SupportedLanguage.JA));
-        formData.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
-        formData.setDefaultLanguage(SupportedLanguage.EN);
-        formData.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
-        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
-
-        String view = controller.step1Submit(formData, redirectAttributes);
-
-        assertThat(view).isEqualTo("redirect:/setup/step1");
-        verify(redirectAttributes).addFlashAttribute(eq("error"),
-                eq("validation.defaultLanguage.invalid"));
-    }
-
-    @Test
-    @DisplayName("step1Submit()でデフォルトTZが利用可能TZに含まれないとstep1にリダイレクト")
-    void step1Submit_invalidDefaultTimezone_redirectsToStep1() {
-        Step1FormData formData = new Step1FormData();
-        formData.setAvailableLanguages(List.of(SupportedLanguage.JA));
-        formData.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
-        formData.setDefaultLanguage(SupportedLanguage.JA);
-        formData.setDefaultTimezone(SupportedTimezone.of("America/New_York"));
-        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
-
-        String view = controller.step1Submit(formData, redirectAttributes);
-
-        assertThat(view).isEqualTo("redirect:/setup/step1");
-        verify(redirectAttributes).addFlashAttribute(eq("error"),
-                eq("validation.defaultTimezone.invalid"));
+        assertThat(view).isEqualTo("setup/step1");
+        assertThat(model.getAttribute("selectedTimezones")).isNotNull();
     }
 
     @Test
@@ -203,9 +231,10 @@ class SetupControllerTest {
         formData.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         formData.setDefaultLanguage(SupportedLanguage.JA);
         formData.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
-        RedirectAttributes redirectAttributes = mock(RedirectAttributes.class);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step1FormData");
+        Model model = new ConcurrentModel();
 
-        String view = controller.step1Submit(formData, redirectAttributes);
+        String view = controller.step1Submit(formData, br, model);
 
         assertThat(view).isEqualTo("redirect:/setup/step2");
         assertThat(setupSessionData.getDefaultLanguage()).isEqualTo(SupportedLanguage.JA);
@@ -214,15 +243,12 @@ class SetupControllerTest {
         assertThat(setupSessionData.getAvailableTimezones()).hasSize(1);
     }
 
-    // ============================================================
-    // Step2
-    // ============================================================
     @Test
     @DisplayName("step2()でhostが未設定ならリクエストのserverNameを設定")
     void step2_hostNull_setsServerName() {
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getServerName()).thenReturn("kizulog.example.com");
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
 
         String view = controller.step2(model, request);
 
@@ -235,7 +261,7 @@ class SetupControllerTest {
     void step2_emptyOidcSettings_addsNewOne() {
         setupSessionData.setHost("existing.example.com");
         HttpServletRequest request = mock(HttpServletRequest.class);
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
 
         controller.step2(model, request);
 
@@ -247,7 +273,7 @@ class SetupControllerTest {
     void step2_hostAlreadySet_doesNotOverwrite() {
         setupSessionData.setHost("existing.example.com");
         HttpServletRequest request = mock(HttpServletRequest.class);
-        Model model = mock(Model.class);
+        Model model = new ConcurrentModel();
 
         controller.step2(model, request);
 
@@ -255,10 +281,32 @@ class SetupControllerTest {
     }
 
     @Test
-    @DisplayName("step2Submit()はhostを設定しOIDC IDをmasterに固定してstep3にリダイレクト")
-    void step2Submit_setsHostAndMasterId_redirectsToStep3() {
+    @DisplayName("step2()はstep2FormDataをModelに設定する（host/oidcSettingがセッションから復元される）")
+    void step2_setsStep2FormDataWithSessionValues() {
+        setupSessionData.setHost("preset.example.com");
+        OidcSetting existing = new OidcSetting();
+        existing.setUri("https://auth.example.com");
+        existing.setClientId("preset-client");
+        existing.setClientSecret("preset-secret");
+        setupSessionData.getOidcSettings().add(existing);
+
+        HttpServletRequest request = mock(HttpServletRequest.class);
+        Model model = new ConcurrentModel();
+
+        controller.step2(model, request);
+
+        assertThat(model.containsAttribute("step2FormData")).isTrue();
+        Step2FormData form = (Step2FormData) model.getAttribute("step2FormData");
+        assertThat(form.getHost()).isEqualTo("preset.example.com");
+        assertThat(form.getOidcSetting().getUri()).isEqualTo("https://auth.example.com");
+        assertThat(form.getOidcSetting().getClientId()).isEqualTo("preset-client");
+        assertThat(form.getOidcSetting().getClientSecret()).isEqualTo("preset-secret");
+    }
+
+    @Test
+    @DisplayName("step2Submit()は正常時、verifyを実行しhost+OIDC設定をセッションに保存してstep3にリダイレクト")
+    void step2Submit_validAndConnectionOk_redirectsToStep3() {
         OidcSetting oidcSetting = new OidcSetting();
-        oidcSetting.setId("user-input-id");
         oidcSetting.setUri("https://auth.example.com");
         oidcSetting.setClientId("client-id");
         oidcSetting.setClientSecret("client-secret");
@@ -266,18 +314,64 @@ class SetupControllerTest {
         Step2FormData formData = new Step2FormData();
         formData.setHost("kizulog.example.com");
         formData.setOidcSetting(oidcSetting);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step2FormData");
+        Model model = new ConcurrentModel();
 
-        String view = controller.step2Submit(formData);
+        String view = controller.step2Submit(formData, br, Locale.JAPAN, model);
 
         assertThat(view).isEqualTo("redirect:/setup/step3");
+        verify(oidcProviderService).verify("https://auth.example.com");
         assertThat(setupSessionData.getHost()).isEqualTo("kizulog.example.com");
         assertThat(setupSessionData.getOidcSettings()).hasSize(1);
         assertThat(setupSessionData.getOidcSettings().get(0).getId()).isEqualTo("master");
+        assertThat(setupSessionData.getOidcSettings().get(0).getUri())
+                .isEqualTo("https://auth.example.com");
     }
 
-    // ============================================================
-    // Step3 / Step4 / Complete
-    // ============================================================
+    @Test
+    @DisplayName("step2Submit()でバリデーションエラーがあればverifyを呼ばずstep2テンプレートを返す")
+    void step2Submit_bindingErrors_returnsTemplate() {
+        Step2FormData formData = new Step2FormData();
+        // host も oidcSetting も空のまま
+        BindingResult br = new BeanPropertyBindingResult(formData, "step2FormData");
+        br.rejectValue("host", "required", "ホスト必須");
+        Model model = new ConcurrentModel();
+
+        String view = controller.step2Submit(formData, br, Locale.JAPAN, model);
+
+        assertThat(view).isEqualTo("setup/step2");
+        verify(oidcProviderService, never()).verify(anyString());
+        assertThat(setupSessionData.getHost()).isNull();
+        assertThat(model.containsAttribute("sessionData")).isTrue();
+    }
+
+    @Test
+    @DisplayName("step2Submit()でOIDC接続確認失敗時、エラーメッセージ付きでstep2テンプレートを返す")
+    void step2Submit_connectionFails_returnsTemplateWithError() {
+        OidcSetting oidcSetting = new OidcSetting();
+        oidcSetting.setUri("https://bad.example.com");
+        oidcSetting.setClientId("client-id");
+        oidcSetting.setClientSecret("client-secret");
+
+        Step2FormData formData = new Step2FormData();
+        formData.setHost("kizulog.example.com");
+        formData.setOidcSetting(oidcSetting);
+        BindingResult br = new BeanPropertyBindingResult(formData, "step2FormData");
+
+        Mockito.doThrow(new OidcConnectionException(OidcConnectionError.CONNECTION_ERROR))
+                .when(oidcProviderService).verify("https://bad.example.com");
+        when(messageSource.getMessage(eq("oidc.error.connection"), any(), any(Locale.class)))
+                .thenReturn("接続失敗");
+
+        Model model = new ConcurrentModel();
+
+        String view = controller.step2Submit(formData, br, Locale.JAPAN, model);
+
+        assertThat(view).isEqualTo("setup/step2");
+        assertThat(br.getGlobalErrors()).isNotEmpty();
+        assertThat(setupSessionData.getHost()).isNull();
+    }
+
     @Test
     @DisplayName("step3()はstep3テンプレートを返しsessionDataをモデルに設定")
     void step3_returnsTemplate() {
@@ -311,9 +405,6 @@ class SetupControllerTest {
         assertThat(view).isEqualTo("setup/complete");
     }
 
-    // ============================================================
-    // checkOidc()
-    // ============================================================
     @Test
     @DisplayName("checkOidc()で接続成功なら成功レスポンスを返す")
     void checkOidc_success_returnsSuccess() {
@@ -381,9 +472,6 @@ class SetupControllerTest {
         assertThat(response.getBody().getErrorType()).isEqualTo("UNEXPECTED_ERROR");
     }
 
-    // ============================================================
-    // oidcLogin()
-    // ============================================================
     @Test
     @DisplayName("oidcLogin()はOIDCプロバイダーの認証URLにリダイレクト")
     void oidcLogin_redirectsToAuthorizationUrl() {
@@ -440,9 +528,6 @@ class SetupControllerTest {
                 eq("http://localhost:8080/setup/callback"));
     }
 
-    // ============================================================
-    // oidcCallback()
-    // ============================================================
     @Test
     @DisplayName("oidcCallback()でstate不一致ならエラーパラメーター付きでstep3にリダイレクト")
     void oidcCallback_stateMismatch_redirectsWithError() {

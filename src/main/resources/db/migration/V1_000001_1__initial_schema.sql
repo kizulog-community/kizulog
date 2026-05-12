@@ -120,6 +120,40 @@ CREATE INDEX system_account_role_status_idx_02
     ON system_account_role_status (status, version DESC);
 
 -- ============================================================
+-- system_oidc_providers（システムOIDCプロバイダー設定）
+-- ============================================================
+CREATE TABLE system_oidc_providers (
+    provider_id    TEXT        NOT NULL, -- 'master', 'google', 'azure-ad' 等（自由入力, [a-z0-9-]+, 1-32文字）
+    version        TIMESTAMPTZ NOT NULL,
+    display_name   TEXT        NOT NULL, -- 管理画面での表示名（例: "Keycloak Master Realm"）
+    uri            TEXT        NOT NULL, -- OIDC Issuer URI
+    client_id      TEXT        NOT NULL,
+    client_secret  TEXT        NOT NULL, -- AES暗号化済み
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT system_oidc_providers_pk PRIMARY KEY (provider_id, version)
+);
+
+-- ============================================================
+-- system_oidc_provider_status（システムOIDCプロバイダーステータス）
+-- ============================================================
+CREATE TABLE system_oidc_provider_status (
+    provider_id    TEXT        NOT NULL,
+    version        TIMESTAMPTZ NOT NULL,
+    status         TEXT        NOT NULL, -- ENABLED / DISABLED
+    reason         TEXT,
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT system_oidc_provider_status_pk PRIMARY KEY (provider_id, version)
+);
+
+CREATE INDEX system_oidc_provider_status_idx_01
+    ON system_oidc_provider_status (provider_id, version DESC);
+
+CREATE INDEX system_oidc_provider_status_idx_02
+    ON system_oidc_provider_status (status, version DESC);
+
+-- ============================================================
 -- tenants（業務テナント基本情報）
 -- ============================================================
 CREATE TABLE tenants (

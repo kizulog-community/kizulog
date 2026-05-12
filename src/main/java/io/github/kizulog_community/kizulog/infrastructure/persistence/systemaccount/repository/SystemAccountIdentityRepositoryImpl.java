@@ -44,6 +44,11 @@ public class SystemAccountIdentityRepositoryImpl
     }
 
     @Override
+    public int countActiveByIss(String iss) {
+        return jpaRepository.countActiveByIss(iss);
+    }
+
+    @Override
     public void save(SystemAccountIdentity identity) {
         jpaRepository.save(toEntity(identity));
     }

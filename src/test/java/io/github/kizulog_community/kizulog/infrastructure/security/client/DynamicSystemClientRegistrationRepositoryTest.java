@@ -19,10 +19,9 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.client.registration.ClientRegistration;
 
-import io.github.kizulog_community.kizulog.domain.systemauth.model.SystemOidcSetting;
-import io.github.kizulog_community.kizulog.domain.systemauth.model.SystemOidcSettings;
-import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemOidcSettingService;
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
 
 /**
  * DynamicSystemClientRegistrationRepositoryの単体テスト
@@ -31,38 +30,37 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProvi
  */
 class DynamicSystemClientRegistrationRepositoryTest {
 
+    private static final String MASTER_PROVIDER_ID = "master";
+    private static final String GOOGLE_PROVIDER_ID = "google";
     private static final String ISSUER = "https://auth.example/realms/master";
+    private static final String GOOGLE_ISSUER = "https://accounts.google.com";
     private static final OffsetDateTime VERSION_1 =
             OffsetDateTime.of(2026, 5, 1, 12, 0, 0, 0, ZoneOffset.UTC);
     private static final OffsetDateTime VERSION_2 =
             OffsetDateTime.of(2026, 5, 2, 12, 0, 0, 0, ZoneOffset.UTC);
 
-    private SystemOidcSettingService systemOidcSettingService;
+    private SystemOidcProviderService systemOidcProviderService;
     private OidcProviderService oidcProviderService;
     private DynamicSystemClientRegistrationRepository repository;
 
     @BeforeEach
     void setUp() {
-        systemOidcSettingService = mock(SystemOidcSettingService.class);
+        systemOidcProviderService = mock(SystemOidcProviderService.class);
         oidcProviderService = mock(OidcProviderService.class);
         repository = new DynamicSystemClientRegistrationRepository(
-                systemOidcSettingService, oidcProviderService);
+                systemOidcProviderService, oidcProviderService);
     }
 
     /**
      * OIDC Discoveryメタデータの最小セットを生成する。
-     *
-     * <p>ClientRegistrations.fromOidcConfigurationが要求する必須フィールドを含む。
-     * いずれのOIDCプロバイダーであっても準拠すべき
-     * OpenID Connect Discovery 1.0仕様に基づく。</p>
      */
-    private Map<String, Object> sampleMetadata() {
+    private Map<String, Object> sampleMetadata(String issuer) {
         return Map.of(
-                "issuer", ISSUER,
-                "authorization_endpoint", ISSUER + "/oauth2/authorize",
-                "token_endpoint", ISSUER + "/oauth2/token",
-                "userinfo_endpoint", ISSUER + "/oauth2/userinfo",
-                "jwks_uri", ISSUER + "/oauth2/jwks",
+                "issuer", issuer,
+                "authorization_endpoint", issuer + "/oauth2/authorize",
+                "token_endpoint", issuer + "/oauth2/token",
+                "userinfo_endpoint", issuer + "/oauth2/userinfo",
+                "jwks_uri", issuer + "/oauth2/jwks",
                 "subject_types_supported", List.of("public"),
                 "id_token_signing_alg_values_supported", List.of("RS256"),
                 "response_types_supported", List.of("code"),
@@ -70,16 +68,18 @@ class DynamicSystemClientRegistrationRepositoryTest {
     }
 
     /**
-     * テスト用のSystemOidcSettingsを生成する。
+     * テスト用の DecryptedOidcProvider を生成する。
      */
-    private SystemOidcSettings settingsWith(OffsetDateTime version, String id) {
-        SystemOidcSetting setting = new SystemOidcSetting(
-                id, ISSUER, "kizulog-master", "decrypted-secret");
-        return new SystemOidcSettings(version, List.of(setting));
+    private DecryptedOidcProvider providerOf(
+            String providerId, String issuer, OffsetDateTime version) {
+        return new DecryptedOidcProvider(
+                providerId, version,
+                "Display " + providerId, issuer,
+                "kizulog-" + providerId, "decrypted-secret-" + providerId);
     }
 
     @Test
-    @DisplayName("findByRegistrationId：nullを渡すとnullが返る")
+    @DisplayName("findByRegistrationId: nullを渡すとnullが返る")
     void findByRegistrationId_withNull_returnsNull() {
         ClientRegistration result = repository.findByRegistrationId(null);
 
@@ -87,48 +87,29 @@ class DynamicSystemClientRegistrationRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByRegistrationId：master以外のIDではnullが返る")
-    void findByRegistrationId_withOtherId_returnsNull() {
-        ClientRegistration result = repository.findByRegistrationId("other-id");
+    @DisplayName("findByRegistrationId: 該当プロバイダーがない場合はnull")
+    void findByRegistrationId_whenNoProvider_returnsNull() {
+        when(systemOidcProviderService.findEnabledForAuthentication("not-exist"))
+                .thenReturn(Optional.empty());
+
+        ClientRegistration result = repository.findByRegistrationId("not-exist");
 
         assertThat(result).isNull();
     }
 
     @Test
-    @DisplayName("findByRegistrationId：OIDC設定がない場合はnull")
-    void findByRegistrationId_whenNoSettings_returnsNull() {
-        when(systemOidcSettingService.findLatest()).thenReturn(Optional.empty());
-
-        ClientRegistration result = repository.findByRegistrationId("master");
-
-        assertThat(result).isNull();
-    }
-
-    @Test
-    @DisplayName("findByRegistrationId：master IDの設定がない場合はnull")
-    void findByRegistrationId_whenNoMasterSetting_returnsNull() {
-        // master以外のIDだけがある状態
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_1, "other")));
-
-        ClientRegistration result = repository.findByRegistrationId("master");
-
-        assertThat(result).isNull();
-    }
-
-    @Test
-    @DisplayName("findByRegistrationId：正常系でClientRegistrationが返される")
+    @DisplayName("findByRegistrationId: 正常系でClientRegistrationが返される")
     void findByRegistrationId_returnsClientRegistration() {
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_1, "master")));
-        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata());
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_1)));
+        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata(ISSUER));
 
-        ClientRegistration result = repository.findByRegistrationId("master");
+        ClientRegistration result = repository.findByRegistrationId(MASTER_PROVIDER_ID);
 
         assertThat(result).isNotNull();
-        assertThat(result.getRegistrationId()).isEqualTo("master");
+        assertThat(result.getRegistrationId()).isEqualTo(MASTER_PROVIDER_ID);
         assertThat(result.getClientId()).isEqualTo("kizulog-master");
-        assertThat(result.getClientSecret()).isEqualTo("decrypted-secret");
+        assertThat(result.getClientSecret()).isEqualTo("decrypted-secret-master");
         assertThat(result.getScopes()).contains("openid");
         assertThat(result.getRedirectUri())
                 .isEqualTo("{baseUrl}/login/oauth2/code/{registrationId}");
@@ -139,46 +120,69 @@ class DynamicSystemClientRegistrationRepositoryTest {
     }
 
     @Test
-    @DisplayName("findByRegistrationId：同じバージョンで2回呼ぶとキャッシュが効きgetMetadataは1回のみ")
+    @DisplayName("findByRegistrationId: 同じバージョンで2回呼ぶとキャッシュが効きgetMetadataは1回のみ")
     void findByRegistrationId_cachesByVersion() {
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_1, "master")));
-        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata());
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_1)));
+        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata(ISSUER));
 
-        ClientRegistration first = repository.findByRegistrationId("master");
-        ClientRegistration second = repository.findByRegistrationId("master");
+        ClientRegistration first = repository.findByRegistrationId(MASTER_PROVIDER_ID);
+        ClientRegistration second = repository.findByRegistrationId(MASTER_PROVIDER_ID);
 
         assertThat(first).isSameAs(second);
         verify(oidcProviderService, times(1)).getMetadata(anyString());
     }
 
     @Test
-    @DisplayName("findByRegistrationId：バージョンが変わると再構築される")
+    @DisplayName("findByRegistrationId: 同一provider_idでもバージョンが変わると再構築される")
     void findByRegistrationId_rebuildsWhenVersionChanges() {
-        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata());
+        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata(ISSUER));
 
-        // 1回目：VERSION_1
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_1, "master")));
-        ClientRegistration first = repository.findByRegistrationId("master");
+        // 1回目: VERSION_1
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_1)));
+        ClientRegistration first = repository.findByRegistrationId(MASTER_PROVIDER_ID);
 
-        // 2回目：VERSION_2に変わった
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_2, "master")));
-        ClientRegistration second = repository.findByRegistrationId("master");
+        // 2回目: VERSION_2 (同一provider_idだがversion変更)
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_2)));
+        ClientRegistration second = repository.findByRegistrationId(MASTER_PROVIDER_ID);
 
         assertThat(first).isNotSameAs(second);
         verify(oidcProviderService, times(2)).getMetadata(anyString());
     }
 
     @Test
-    @DisplayName("findByRegistrationId：getMetadataは設定のuriで呼ばれる")
-    void findByRegistrationId_callsGetMetadataWithSettingUri() {
-        when(systemOidcSettingService.findLatest())
-                .thenReturn(Optional.of(settingsWith(VERSION_1, "master")));
-        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata());
+    @DisplayName("findByRegistrationId: 異なるprovider_idはそれぞれ独立にキャッシュされる")
+    void findByRegistrationId_cachesPerProviderId() {
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_1)));
+        when(systemOidcProviderService.findEnabledForAuthentication(GOOGLE_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(GOOGLE_PROVIDER_ID, GOOGLE_ISSUER, VERSION_1)));
+        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata(ISSUER));
+        when(oidcProviderService.getMetadata(GOOGLE_ISSUER)).thenReturn(sampleMetadata(GOOGLE_ISSUER));
 
-        repository.findByRegistrationId("master");
+        ClientRegistration master1 = repository.findByRegistrationId(MASTER_PROVIDER_ID);
+        ClientRegistration google1 = repository.findByRegistrationId(GOOGLE_PROVIDER_ID);
+        ClientRegistration master2 = repository.findByRegistrationId(MASTER_PROVIDER_ID);
+
+        // 同一provider_idは同一インスタンス
+        assertThat(master1).isSameAs(master2);
+        // 異なるprovider_idは別インスタンス
+        assertThat(master1).isNotSameAs(google1);
+        // メタデータ取得は各provider_id 1回ずつ
+        verify(oidcProviderService, times(1)).getMetadata(ISSUER);
+        verify(oidcProviderService, times(1)).getMetadata(GOOGLE_ISSUER);
+    }
+
+    @Test
+    @DisplayName("findByRegistrationId: getMetadataはプロバイダーのuriで呼ばれる")
+    void findByRegistrationId_callsGetMetadataWithProviderUri() {
+        when(systemOidcProviderService.findEnabledForAuthentication(MASTER_PROVIDER_ID))
+                .thenReturn(Optional.of(providerOf(MASTER_PROVIDER_ID, ISSUER, VERSION_1)));
+        when(oidcProviderService.getMetadata(ISSUER)).thenReturn(sampleMetadata(ISSUER));
+
+        repository.findByRegistrationId(MASTER_PROVIDER_ID);
 
         verify(oidcProviderService, atLeastOnce()).getMetadata(ISSUER);
     }

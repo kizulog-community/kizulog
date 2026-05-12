@@ -3,6 +3,7 @@ package io.github.kizulog_community.kizulog.domain.setup;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -18,7 +19,6 @@ import org.mockito.ArgumentCaptor;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
-import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
@@ -37,6 +37,8 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
 import io.github.kizulog_community.kizulog.domain.systemconfig.port.SystemConfigRepository;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.OidcSetting;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.SetupSessionData;
 
@@ -54,7 +56,7 @@ class SetupServiceTest {
     private SystemAccountIdentityStatusRepository systemAccountIdentityStatusRepository;
     private SystemAccountRoleRepository systemAccountRoleRepository;
     private SystemAccountRoleStatusRepository systemAccountRoleStatusRepository;
-    private CryptoPort cryptoPort;
+    private SystemOidcProviderService systemOidcProviderService;
     private ObjectMapper objectMapper;
     private SetupService service;
 
@@ -67,7 +69,7 @@ class SetupServiceTest {
         systemAccountIdentityStatusRepository = mock(SystemAccountIdentityStatusRepository.class);
         systemAccountRoleRepository = mock(SystemAccountRoleRepository.class);
         systemAccountRoleStatusRepository = mock(SystemAccountRoleStatusRepository.class);
-        cryptoPort = mock(CryptoPort.class);
+        systemOidcProviderService = mock(SystemOidcProviderService.class);
         objectMapper = new ObjectMapper();
 
         service = new SetupService(
@@ -78,7 +80,7 @@ class SetupServiceTest {
                 systemAccountIdentityStatusRepository,
                 systemAccountRoleRepository,
                 systemAccountRoleStatusRepository,
-                cryptoPort,
+                systemOidcProviderService,
                 objectMapper);
     }
 
@@ -108,45 +110,34 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でsystem_configが3件（OIDC/LANGUAGE/TIMEZONE）保存される")
-    void save_savesThreeSystemConfigs() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+    @DisplayName("save()でsystem_configが2件（LANGUAGE/TIMEZONE）保存される")
+    void save_savesTwoSystemConfigs() {
         service.save(createSessionData());
-        verify(systemConfigRepository, times(3)).save(any(SystemConfig.class));
+        verify(systemConfigRepository, times(2)).save(any(SystemConfig.class));
     }
 
     @Test
-    @DisplayName("save()でOIDC設定が暗号化されて保存される")
-    void save_oidcClientSecretIsEncrypted() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+    @DisplayName("save()でsystemOidcProviderService.registerが呼ばれる")
+    void save_callsSystemOidcProviderServiceRegister() {
         service.save(createSessionData());
-        verify(cryptoPort).encrypt("plain-secret");
-    }
-
-    @Test
-    @DisplayName("save()のOIDC設定にencrypted-secretが含まれる")
-    void save_oidcConfigContainsEncryptedSecret() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
-        service.save(createSessionData());
-
-        ArgumentCaptor<SystemConfig> captor = ArgumentCaptor.forClass(SystemConfig.class);
-        verify(systemConfigRepository, times(3)).save(captor.capture());
-
-        SystemConfig oidcConfig = captor.getAllValues().stream()
-                .filter(c -> "OIDC".equals(c.getKey()))
-                .findFirst().orElseThrow();
-        assertThat(oidcConfig.getValue()).contains("encrypted-secret");
-        assertThat(oidcConfig.getValue()).doesNotContain("plain-secret");
+        verify(systemOidcProviderService).register(
+                eq("master"),
+                eq("master"),                                   // displayName=id
+                eq("https://auth.example.com/realms/master"),
+                eq("kizulog-client"),
+                eq("plain-secret"),
+                eq(OidcProviderStatusValue.ENABLED),
+                any(),
+                eq("system:setup-wizard"));
     }
 
     @Test
     @DisplayName("save()のLANGUAGE設定にDEFAULTとAVAILABLEが含まれる")
     void save_languageConfigContainsDefaultAndAvailable() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemConfig> captor = ArgumentCaptor.forClass(SystemConfig.class);
-        verify(systemConfigRepository, times(3)).save(captor.capture());
+        verify(systemConfigRepository, times(2)).save(captor.capture());
 
         SystemConfig langConfig = captor.getAllValues().stream()
                 .filter(c -> "LANGUAGE".equals(c.getKey()))
@@ -158,11 +149,10 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()のTIMEZONE設定にDEFAULTとAVAILABLEが含まれる")
     void save_timezoneConfigContainsDefaultAndAvailable() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemConfig> captor = ArgumentCaptor.forClass(SystemConfig.class);
-        verify(systemConfigRepository, times(3)).save(captor.capture());
+        verify(systemConfigRepository, times(2)).save(captor.capture());
 
         SystemConfig tzConfig = captor.getAllValues().stream()
                 .filter(c -> "TIMEZONE".equals(c.getKey()))
@@ -174,7 +164,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_accountsが保存される（accountIdのみ、iss/aud/subはidentity側）")
     void save_savesSystemAccount() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccount> captor =
@@ -189,7 +178,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_account_statusがACTIVEで保存される")
     void save_savesSystemAccountStatusAsActive() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountStatus> captor =
@@ -205,7 +193,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_account_identitiesがiss/aud/sub付きで保存される")
     void save_savesSystemAccountIdentity() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountIdentity> captor =
@@ -223,7 +210,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_account_identity_statusがACTIVEで保存される")
     void save_savesSystemAccountIdentityStatusAsActive() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountIdentityStatus> captor =
@@ -239,7 +225,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_account_rolesがSYSTEM_ADMINで保存される（role_idベース）")
     void save_savesSystemAccountRoleAsSystemAdmin() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountRole> captor =
@@ -255,7 +240,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でsystem_account_role_statusがACTIVEで保存される")
     void save_savesSystemAccountRoleStatusAsActive() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountRoleStatus> captor =
@@ -271,7 +255,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でアカウント・ステータス・identityが同じaccountIdで保存される")
     void save_useSameAccountIdAcrossEntities() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccount> accountCaptor =
@@ -297,7 +280,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でidentityとidentity_statusが同じidentityIdで保存される")
     void save_useSameIdentityIdAcrossIdentityEntities() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountIdentity> identityCaptor =
@@ -315,7 +297,6 @@ class SetupServiceTest {
     @Test
     @DisplayName("save()でroleとrole_statusが同じroleIdで保存される")
     void save_useSameRoleIdAcrossRoleEntities() {
-        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
         service.save(createSessionData());
 
         ArgumentCaptor<SystemAccountRole> roleCaptor =
@@ -331,8 +312,8 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でOIDCのJSON変換に失敗するとRuntimeException")
-    void save_oidcJsonProcessingException_throwsRuntimeException() throws Exception {
+    @DisplayName("save()でLANGUAGE/TIMEZONEのJSON変換に失敗するとRuntimeException")
+    void save_jsonProcessingException_throwsRuntimeException() throws Exception {
         ObjectMapper mockMapper = mock(ObjectMapper.class);
         when(mockMapper.writeValueAsString(any()))
                 .thenThrow(new JsonProcessingException("error") {
@@ -347,14 +328,12 @@ class SetupServiceTest {
                 systemAccountIdentityStatusRepository,
                 systemAccountRoleRepository,
                 systemAccountRoleStatusRepository,
-                cryptoPort,
+                systemOidcProviderService,
                 mockMapper);
-
-        when(cryptoPort.encrypt(any())).thenReturn("encrypted");
 
         assertThatThrownBy(() -> failingService.save(createSessionData()))
                 .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("OIDC設定のJSON変換に失敗しました");
+                .hasMessageContaining("設定のJSON変換に失敗しました");
     }
 
 }

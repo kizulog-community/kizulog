@@ -46,6 +46,21 @@ public interface SystemAccountIdentityRepository {
     List<SystemAccountIdentity> findLatestByAccountId(String accountId);
 
     /**
+     * 指定したIssuer URIに紐付くACTIVEなidentityの件数を取得する。
+     *
+     * <p>「ACTIVE」とは最新ステータスがACTIVEであることを指す。
+     * 各identity_idの最新versionを基準とし、issが一致するもののうち
+     * 最新ステータスがACTIVEな件数を返す。</p>
+     *
+     * <p>主にOIDCプロバイダーの管理画面で「このプロバイダーで連携中の管理者数」を
+     * 表示する用途で使用する。</p>
+     *
+     * @param iss OIDC Issuer URI
+     * @return ACTIVEなidentityの件数
+     */
+    int countActiveByIss(String iss);
+
+    /**
      * システム管理アカウント認証方法を保存する。
      *
      * @param identity 保存するシステム管理アカウント認証方法

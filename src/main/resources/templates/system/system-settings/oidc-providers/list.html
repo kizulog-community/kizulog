@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.oidcProviders.list.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='system-settings')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings}"
+                               th:text="#{system.systemSettings.title}">システム管理</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.oidcProviders.list.breadcrumb}">
+                            OIDC プロバイダー
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-shield-lock me-2"></i>
+                        <span th:text="#{system.oidcProviders.list.title}">OIDC プロバイダー</span>
+                    </h1>
+                    <!-- 新規追加ボタン -->
+                    <a class="btn btn-primary"
+                       th:href="@{/system/system-settings/oidc-providers/new}">
+                        <i class="bi bi-plus-lg me-1"></i>
+                        <span th:text="#{system.oidcProviders.list.button.add}">新規追加</span>
+                    </a>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{${flashSuccessKey}(${flashSuccessParam})}">成功しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ -->
+                <div th:if="${flashErrorKey}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="#{__${flashErrorKey}__}">エラーが発生しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- フィルタ -->
+                <div class="card mb-3">
+                    <div class="card-body py-2">
+                        <form method="get" class="d-flex align-items-center gap-2">
+                            <label for="filter" class="form-label mb-0 me-2"
+                                   th:text="#{system.oidcProviders.list.filter.label}">表示:</label>
+                            <select id="filter" name="filter" class="form-select form-select-sm w-auto"
+                                    onchange="this.form.submit()">
+                                <option value="all"
+                                        th:selected="${filter == 'all'}"
+                                        th:text="#{system.oidcProviders.list.filter.all}">全て</option>
+                                <option value="enabled"
+                                        th:selected="${filter == 'enabled'}"
+                                        th:text="#{system.oidcProviders.list.filter.enabled}">有効のみ</option>
+                                <option value="disabled"
+                                        th:selected="${filter == 'disabled'}"
+                                        th:text="#{system.oidcProviders.list.filter.disabled}">無効のみ</option>
+                            </select>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 一覧テーブル -->
+                <div class="card">
+                    <div class="card-body p-0">
+
+                        <!-- 0件 -->
+                        <div th:if="${#lists.isEmpty(items)}" class="text-center py-5">
+                            <i class="bi bi-inbox text-secondary" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted mb-0"
+                               th:text="#{system.oidcProviders.list.empty}">
+                                該当するプロバイダーはありません。
+                            </p>
+                        </div>
+
+                        <!-- 1件以上 -->
+                        <table th:if="${not #lists.isEmpty(items)}"
+                               class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th th:text="#{system.oidcProviders.list.column.id}">ID</th>
+                                    <th th:text="#{system.oidcProviders.list.column.displayName}">表示名</th>
+                                    <th class="text-end" th:text="#{system.oidcProviders.list.column.identities}">連携数</th>
+                                    <th th:text="#{system.oidcProviders.list.column.status}">ステータス</th>
+                                    <th class="text-end" th:text="#{system.oidcProviders.list.column.actions}">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="item : ${items}">
+                                    <td>
+                                        <code th:text="${item.providerId}">master</code>
+                                    </td>
+                                    <td th:text="${item.displayName}">Keycloak Master</td>
+                                    <td class="text-end">
+                                        <span class="badge bg-light text-dark"
+                                              th:text="${item.activeIdentityCount}">3</span>
+                                    </td>
+                                    <td>
+                                        <!-- ENABLED -->
+                                        <span th:if="${item.enabled}" class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <span th:text="#{system.oidcProviders.status.enabled}">有効</span>
+                                        </span>
+                                        <!-- DISABLED -->
+                                        <span th:unless="${item.enabled}" class="badge bg-secondary">
+                                            <i class="bi bi-pause-circle me-1"></i>
+                                            <span th:text="#{system.oidcProviders.status.disabled}">無効</span>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           th:href="@{/system/system-settings/oidc-providers/{id}(id=${item.providerId})}">
+                                            <i class="bi bi-eye"></i>
+                                            <span th:text="#{system.oidcProviders.list.action.detail}">詳細</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.oidcProviders.detail.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='system-settings')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings}"
+                               th:text="#{system.systemSettings.title}">システム管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings/oidc-providers}"
+                               th:text="#{system.oidcProviders.list.breadcrumb}">OIDC プロバイダー</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="${provider.providerId}">master</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル + アクションボタン -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-shield-lock me-2"></i>
+                        <span th:text="${provider.displayName}">Keycloak Master</span>
+                    </h1>
+                    <div class="d-flex gap-2">
+                        <!-- 編集ボタン -->
+                        <a class="btn btn-outline-primary"
+                           th:href="@{/system/system-settings/oidc-providers/{id}/edit(id=${provider.providerId})}">
+                            <i class="bi bi-pencil me-1"></i>
+                            <span th:text="#{system.oidcProviders.detail.button.edit}">編集</span>
+                        </a>
+                        <!-- 無効化ボタン -->
+                        <button th:if="${provider.enabled}"
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#disableModal">
+                            <i class="bi bi-pause-circle me-1"></i>
+                            <span th:text="#{system.oidcProviders.detail.button.disable}">無効化</span>
+                        </button>
+                        <!-- 有効化ボタン -->
+                        <button th:unless="${provider.enabled}"
+                                type="button"
+                                class="btn btn-outline-success"
+                                data-bs-toggle="modal"
+                                data-bs-target="#enableModal">
+                            <i class="bi bi-play-circle me-1"></i>
+                            <span th:text="#{system.oidcProviders.detail.button.enable}">有効化</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{${flashSuccessKey}(${flashSuccessParam})}">成功しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ（状態変更失敗時） -->
+                <div th:if="${flashErrorMessage}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラー</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- 基本情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <span th:text="#{system.oidcProviders.detail.section.basic}">基本情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.providerId}">プロバイダーID</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${provider.providerId}">master</code>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.oidcProviders.detail.note.providerIdImmutable}">
+                                    （変更不可）
+                                </small>
+                            </dd>
+
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.displayName}">表示名</dt>
+                            <dd class="col-sm-9" th:text="${provider.displayName}">Keycloak Master</dd>
+
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.status}">ステータス</dt>
+                            <dd class="col-sm-9">
+                                <span th:if="${provider.enabled}" class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span th:text="#{system.oidcProviders.status.enabled}">有効</span>
+                                </span>
+                                <span th:unless="${provider.enabled}" class="badge bg-secondary">
+                                    <i class="bi bi-pause-circle me-1"></i>
+                                    <span th:text="#{system.oidcProviders.status.disabled}">無効</span>
+                                </span>
+                                <span th:if="${provider.statusReason != null and !#strings.isEmpty(provider.statusReason)}"
+                                      class="text-muted ms-2 small"
+                                      th:text="${'(' + provider.statusReason + ')'}">(...)</span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- OIDC接続情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-link-45deg me-2"></i>
+                            <span th:text="#{system.oidcProviders.detail.section.oidc}">OIDC接続情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.uri}">Issuer URI</dt>
+                            <dd class="col-sm-9">
+                                <code class="text-break" th:text="${provider.uri}">https://...</code>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.oidcProviders.detail.note.uriImmutable}">
+                                    （変更不可）
+                                </small>
+                            </dd>
+
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.clientId}">Client ID</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${provider.clientId}">kizulog-system</code>
+                            </dd>
+
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.clientSecret}">Client Secret</dt>
+                            <dd class="col-sm-9">
+                                <code class="text-muted" th:text="${provider.clientSecretMasked}">••••••••</code>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- 利用状況 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-people me-2"></i>
+                            <span th:text="#{system.oidcProviders.detail.section.usage}">利用状況</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.activeIdentityCount}">連携中ACTIVE identity数</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-light text-dark fs-6"
+                                      th:text="${provider.activeIdentityCount}">3</span>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.oidcProviders.detail.note.identityCount}">
+                                    件のシステム管理者がこのプロバイダーで連携中
+                                </small>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- 監査情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span th:text="#{system.oidcProviders.detail.section.audit}">監査情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.createdAt}">作成日時</dt>
+                            <dd class="col-sm-9"
+                                th:text="${#temporals.format(provider.createdAt, 'yyyy-MM-dd HH:mm:ss z')}">
+                                2026-05-04 02:30:15 UTC
+                            </dd>
+
+                            <dt class="col-sm-3" th:text="#{system.oidcProviders.field.createdBy}">作成者</dt>
+                            <dd class="col-sm-9" th:text="${provider.createdBy}">system:setup-wizard</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- 戻るリンク -->
+                <div class="mb-4">
+                    <a th:href="@{/system/system-settings/oidc-providers}"
+                       class="btn btn-link text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.oidcProviders.detail.button.back}">一覧に戻る</span>
+                    </a>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 無効化モーダル                                              -->
+    <!-- ============================================================ -->
+    <div th:if="${provider.enabled}"
+         class="modal fade"
+         id="disableModal"
+         tabindex="-1"
+         aria-labelledby="disableModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <form th:action="@{/system/system-settings/oidc-providers/{id}/disable(id=${provider.providerId})}"
+                  th:object="${statusChangeForm}"
+                  method="post"
+                  novalidate>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="disableModalLabel">
+                            <i class="bi bi-pause-circle me-2 text-secondary"></i>
+                            <span th:text="#{system.oidcProviders.statusChange.disable.title}">プロバイダーを無効化</span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p th:text="#{system.oidcProviders.statusChange.disable.confirm(${provider.displayName})}">
+                            「Keycloak Master」を無効化しますか？
+                        </p>
+                        <div class="alert alert-warning small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <span th:text="#{system.oidcProviders.statusChange.disable.warning}">
+                                無効化すると、このプロバイダーでの新規ログインができなくなります。
+                            </span>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="disableReason" class="form-label">
+                                <span th:text="#{system.oidcProviders.statusChange.field.reason}">理由</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea id="disableReason"
+                                      th:field="*{reason}"
+                                      th:errorclass="is-invalid"
+                                      class="form-control"
+                                      rows="3"
+                                      maxlength="500"></textarea>
+                            <div class="invalid-feedback"
+                                 th:errors="*{reason}">エラー</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link text-decoration-none"
+                                data-bs-dismiss="modal"
+                                th:text="#{system.oidcProviders.form.button.cancel}">キャンセル</button>
+                        <button type="submit" class="btn btn-secondary">
+                            <i class="bi bi-pause-circle me-1"></i>
+                            <span th:text="#{system.oidcProviders.statusChange.disable.button}">無効化する</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 有効化モーダル                                              -->
+    <!-- ============================================================ -->
+    <div th:unless="${provider.enabled}"
+         class="modal fade"
+         id="enableModal"
+         tabindex="-1"
+         aria-labelledby="enableModalLabel"
+         aria-hidden="true">
+        <div class="modal-dialog">
+            <form th:action="@{/system/system-settings/oidc-providers/{id}/enable(id=${provider.providerId})}"
+                  th:object="${statusChangeForm}"
+                  method="post"
+                  novalidate>
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="enableModalLabel">
+                            <i class="bi bi-play-circle me-2 text-success"></i>
+                            <span th:text="#{system.oidcProviders.statusChange.enable.title}">プロバイダーを有効化</span>
+                        </h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <p th:text="#{system.oidcProviders.statusChange.enable.confirm(${provider.displayName})}">
+                            「Keycloak Master」を有効化しますか？
+                        </p>
+
+                        <div class="mb-3">
+                            <label for="enableReason" class="form-label">
+                                <span th:text="#{system.oidcProviders.statusChange.field.reason}">理由</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <textarea id="enableReason"
+                                      th:field="*{reason}"
+                                      th:errorclass="is-invalid"
+                                      class="form-control"
+                                      rows="3"
+                                      maxlength="500"></textarea>
+                            <div class="invalid-feedback"
+                                 th:errors="*{reason}">エラー</div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-link text-decoration-none"
+                                data-bs-dismiss="modal"
+                                th:text="#{system.oidcProviders.form.button.cancel}">キャンセル</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-play-circle me-1"></i>
+                            <span th:text="#{system.oidcProviders.statusChange.enable.button}">有効化する</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <!-- バリデーションエラー時のモーダル自動再表示 -->
+    <script th:if="${openModal}" th:inline="javascript">
+        (function () {
+            'use strict';
+            const target = /*[[${openModal}]]*/ '';
+            const modalId = (target === 'enable') ? 'enableModal' : 'disableModal';
+            const modalEl = document.getElementById(modalId);
+            if (modalEl) {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            }
+        })();
+    </script>
+
+</body>
+</html>
