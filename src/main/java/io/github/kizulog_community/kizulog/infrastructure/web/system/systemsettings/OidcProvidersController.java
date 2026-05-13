@@ -28,10 +28,10 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProvi
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProviderStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
-import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.systemsettings.dto.OidcConnectionTestForEditRequest;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.systemsettings.dto.OidcConnectionTestRequest;
@@ -105,6 +105,11 @@ public class OidcProvidersController {
         OidcProviderDetailView view = toDetailView(opt.get());
         model.addAttribute("activeMenu", "system-settings");
         model.addAttribute("provider", view);
+
+        // G.6: 「最低1つENABLED」UI事前ガード用フラグ
+        // 現状ENABLEDで、他にENABLEDなプロバイダーが存在しない場合は無効化不可
+        int otherEnabledCount = systemOidcProviderService.countOtherEnabled(providerId);
+        model.addAttribute("canDisable", otherEnabledCount > 0);
 
         if (!model.containsAttribute("statusChangeForm")) {
             model.addAttribute("statusChangeForm", new OidcProviderStatusChangeForm());
@@ -196,7 +201,7 @@ public class OidcProvidersController {
         }
 
         if (!model.containsAttribute("oidcProviderEditForm")) {
-            SystemOidcProvider p = opt.get().provider();
+            SystemOidcProvider p = opt.get().getProvider();
             OidcProviderEditForm form = new OidcProviderEditForm();
             form.setProviderId(p.getProviderId());
             form.setUri(p.getUri());
@@ -238,7 +243,7 @@ public class OidcProvidersController {
                     "system.oidcProviders.error.notFound");
             return "redirect:/system/system-settings/oidc-providers";
         }
-        String dbUri = currentOpt.get().provider().getUri();
+        String dbUri = currentOpt.get().getProvider().getUri();
 
         try {
             oidcProviderService.verify(dbUri);
@@ -403,7 +408,7 @@ public class OidcProvidersController {
                     OidcConnectionTestResponse.failure("PROVIDER_NOT_FOUND", errorMessage));
         }
 
-        String dbUri = opt.get().provider().getUri();
+        String dbUri = opt.get().getProvider().getUri();
         try {
             oidcProviderService.verify(dbUri);
             return ResponseEntity.ok(OidcConnectionTestResponse.success());
@@ -422,21 +427,21 @@ public class OidcProvidersController {
         if ("all".equalsIgnoreCase(filter)) {
             return true;
         }
-        if (pws.status() == null) {
+        if (pws.getStatus() == null) {
             return false;
         }
         if ("enabled".equalsIgnoreCase(filter)) {
-            return pws.status().getStatus() == OidcProviderStatusValue.ENABLED;
+            return pws.getStatus().getStatus() == OidcProviderStatusValue.ENABLED;
         }
         if ("disabled".equalsIgnoreCase(filter)) {
-            return pws.status().getStatus() == OidcProviderStatusValue.DISABLED;
+            return pws.getStatus().getStatus() == OidcProviderStatusValue.DISABLED;
         }
         return true;
     }
 
     private OidcProviderListItem toListItem(ProviderWithStatus pws) {
-        SystemOidcProvider p = pws.provider();
-        SystemOidcProviderStatus s = pws.status();
+        SystemOidcProvider p = pws.getProvider();
+        SystemOidcProviderStatus s = pws.getStatus();
         OidcProviderStatusValue statusValue =
                 (s != null) ? s.getStatus() : OidcProviderStatusValue.DISABLED;
         int count = systemAccountIdentityRepository.countActiveByIss(p.getUri());
@@ -448,8 +453,8 @@ public class OidcProvidersController {
     }
 
     private OidcProviderDetailView toDetailView(ProviderWithStatus pws) {
-        SystemOidcProvider p = pws.provider();
-        SystemOidcProviderStatus s = pws.status();
+        SystemOidcProvider p = pws.getProvider();
+        SystemOidcProviderStatus s = pws.getStatus();
         OidcProviderStatusValue statusValue =
                 (s != null) ? s.getStatus() : OidcProviderStatusValue.DISABLED;
         String reason = (s != null) ? s.getReason() : null;

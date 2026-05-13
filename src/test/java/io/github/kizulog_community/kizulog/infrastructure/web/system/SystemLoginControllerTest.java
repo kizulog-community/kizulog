@@ -1,8 +1,11 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.system;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -11,6 +14,9 @@ import org.junit.jupiter.api.Test;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.EnabledProviderView;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
+
 /**
  * SystemLoginControllerの単体テスト
  *
@@ -18,12 +24,16 @@ import org.springframework.ui.Model;
  */
 class SystemLoginControllerTest {
 
+    private SystemOidcProviderService systemOidcProviderService;
     private SystemLoginController controller;
     private Model model;
 
     @BeforeEach
     void setUp() {
-        controller = new SystemLoginController();
+        systemOidcProviderService = mock(SystemOidcProviderService.class);
+        // デフォルトは空リストを返す（必要なテストで上書き）
+        when(systemOidcProviderService.listEnabledForLogin()).thenReturn(List.of());
+        controller = new SystemLoginController(systemOidcProviderService);
         model = new ConcurrentModel();
     }
 
@@ -66,17 +76,37 @@ class SystemLoginControllerTest {
     }
 
     @Test
-    @DisplayName("showLoginPage: oauth2LoginUrl属性が/oauth2/authorization/masterに設定される")
-    void showLoginPage_setsOauth2LoginUrl() {
+    @DisplayName("showLoginPage: ENABLEDプロバイダーが複数ある場合、providers属性にすべて含まれる")
+    @SuppressWarnings("unchecked")
+    void showLoginPage_setsProvidersAttribute_withMultipleProviders() {
+        when(systemOidcProviderService.listEnabledForLogin()).thenReturn(List.of(
+                new EnabledProviderView("master", "Master"),
+                new EnabledProviderView("google", "Google Workspace")));
+
         controller.showLoginPage(null, null, model);
 
         Map<String, Object> attrs = toMap(model);
-        assertThat(attrs.get("oauth2LoginUrl"))
-                .isEqualTo("/oauth2/authorization/master");
+        List<EnabledProviderView> providers = (List<EnabledProviderView>) attrs.get("providers");
+        assertThat(providers).hasSize(2);
+        assertThat(providers.get(0).getProviderId()).isEqualTo("master");
+        assertThat(providers.get(1).getProviderId()).isEqualTo("google");
     }
 
     @Test
-    @DisplayName("showLoginPage: 既知エラーコード（ACCOUNT_NOT_FOUND）はそのままmodelに設定される")
+    @DisplayName("showLoginPage: ENABLEDプロバイダーが0件の場合、providers属性は空リスト")
+    @SuppressWarnings("unchecked")
+    void showLoginPage_setsEmptyProviders_whenNoEnabledProviders() {
+        when(systemOidcProviderService.listEnabledForLogin()).thenReturn(List.of());
+
+        controller.showLoginPage(null, null, model);
+
+        Map<String, Object> attrs = toMap(model);
+        List<EnabledProviderView> providers = (List<EnabledProviderView>) attrs.get("providers");
+        assertThat(providers).isEmpty();
+    }
+
+    @Test
+    @DisplayName("showLoginPage: 既知エラーコード(ACCOUNT_NOT_FOUND)はそのままmodelに設定される")
     void showLoginPage_passesKnownErrorCode_accountNotFound() {
         controller.showLoginPage("ACCOUNT_NOT_FOUND", null, model);
 
@@ -86,7 +116,7 @@ class SystemLoginControllerTest {
     }
 
     @Test
-    @DisplayName("showLoginPage: 既知エラーコード（ACCOUNT_INACTIVE）はそのままmodelに設定される")
+    @DisplayName("showLoginPage: 既知エラーコード(ACCOUNT_INACTIVE)はそのままmodelに設定される")
     void showLoginPage_passesKnownErrorCode_accountInactive() {
         controller.showLoginPage("ACCOUNT_INACTIVE", null, model);
 
@@ -95,7 +125,7 @@ class SystemLoginControllerTest {
     }
 
     @Test
-    @DisplayName("showLoginPage: 既知エラーコード（ROLE_NOT_GRANTED）はそのままmodelに設定される")
+    @DisplayName("showLoginPage: 既知エラーコード(ROLE_NOT_GRANTED)はそのままmodelに設定される")
     void showLoginPage_passesKnownErrorCode_roleNotGranted() {
         controller.showLoginPage("ROLE_NOT_GRANTED", null, model);
 

@@ -35,10 +35,10 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProvi
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProviderStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
-import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.systemsettings.dto.OidcConnectionTestForEditRequest;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.systemsettings.dto.OidcConnectionTestRequest;

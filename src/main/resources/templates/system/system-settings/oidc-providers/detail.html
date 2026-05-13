@@ -44,7 +44,24 @@
                             <span th:text="#{system.oidcProviders.detail.button.edit}">編集</span>
                         </a>
                         <!-- 無効化ボタン -->
-                        <button th:if="${provider.enabled}"
+                        <!-- G.6: 他にENABLEDがない場合は disabled + ツールチップで理由表示 -->
+                        <!-- Bootstrap 5の制約: disabled要素はホバーイベントを受け取らないため、 -->
+                        <!-- ツールチップ発火させるには span ラッパーが必要 -->
+                        <span th:if="${provider.enabled and !canDisable}"
+                              class="d-inline-block"
+                              tabindex="0"
+                              data-bs-toggle="tooltip"
+                              data-bs-placement="top"
+                              th:attr="data-bs-title=#{system.oidcProviders.statusChange.disable.lastEnabledTooltip}">
+                            <button type="button"
+                                    class="btn btn-outline-secondary"
+                                    disabled
+                                    style="pointer-events: none;">
+                                <i class="bi bi-pause-circle me-1"></i>
+                                <span th:text="#{system.oidcProviders.detail.button.disable}">無効化</span>
+                            </button>
+                        </span>
+                        <button th:if="${provider.enabled and canDisable}"
                                 type="button"
                                 class="btn btn-outline-secondary"
                                 data-bs-toggle="modal"
@@ -328,6 +345,15 @@
     </div>
 
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <!-- G.6: ツールチップ初期化（無効化ボタンの「最後の1件」ガード用） -->
+    <script>
+        (function () {
+            'use strict';
+            const tooltipTriggerList = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+            tooltipTriggerList.forEach(el => new bootstrap.Tooltip(el));
+        })();
+    </script>
 
     <!-- バリデーションエラー時のモーダル自動再表示 -->
     <script th:if="${openModal}" th:inline="javascript">

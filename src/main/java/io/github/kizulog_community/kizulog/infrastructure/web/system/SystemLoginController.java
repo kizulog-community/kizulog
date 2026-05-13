@@ -9,12 +9,15 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationErrorType;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
+import lombok.RequiredArgsConstructor;
 
 /**
  * システム管理ログインコントローラー
  *
  * <p>システム管理画面のログインページを表示する。
- * 実際の認証はSpring SecurityのOAuth2 Loginフロー（/oauth2/authorization/master）に委譲。</p>
+ * 実際の認証はSpring SecurityのOAuth2 Loginフロー
+ * （/oauth2/authorization/{providerId}）に委譲。</p>
  *
  * <p>URL設計:
  * <ul>
@@ -29,19 +32,21 @@ import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAut
  * <p>エラーコードは SystemAuthenticationErrorType のenum名のホワイトリスト検証を行う。
  * 不明なコードは unknown に正規化して画面に渡す（XSS対策）。</p>
  *
+ * <p>プロバイダー一覧:
+ * ENABLEDなOIDCプロバイダーを一覧で画面に渡す。
+ * 画面側はprovider_idごとに /oauth2/authorization/{providerId} のリンクを生成する。</p>
+ *
  * @author Jun Kobayashi
  */
 @Controller
 @RequestMapping("/system")
+@RequiredArgsConstructor
 public class SystemLoginController {
-
-    /** OAuth2認可開始エンドポイント（Spring Security固定パス） */
-    private static final String OAUTH2_LOGIN_URL = "/oauth2/authorization/master";
 
     /** 不明なエラーコードを示すマーカー */
     static final String ERROR_CODE_UNKNOWN = "unknown";
 
-    /** 許容エラーコードのホワイトリスト（SystemAuthenticationErrorType由来） */
+    /** 許容エラーコードのホワイトリスト */
     private static final Set<String> ALLOWED_ERROR_CODES = buildAllowedErrorCodes();
 
     private static Set<String> buildAllowedErrorCodes() {
@@ -51,6 +56,9 @@ public class SystemLoginController {
         }
         return java.util.Collections.unmodifiableSet(set);
     }
+
+    /** OIDCプロバイダーサービス */
+    private final SystemOidcProviderService systemOidcProviderService;
 
     /**
      * ログインページを表示する。
@@ -69,7 +77,7 @@ public class SystemLoginController {
         model.addAttribute("error", hasError);
         model.addAttribute("errorCode", hasError ? normalizeErrorCode(error) : null);
         model.addAttribute("logout", logout != null);
-        model.addAttribute("oauth2LoginUrl", OAUTH2_LOGIN_URL);
+        model.addAttribute("providers", systemOidcProviderService.listEnabledForLogin());
         return "system/login";
     }
 

@@ -59,11 +59,22 @@
                 Sign in with your OIDC provider to access the system administration console.
             </p>
 
-            <div class="d-grid">
-                <a th:href="${oauth2LoginUrl}" class="btn btn-primary btn-login">
+            <!-- プロバイダーがある場合：プロバイダー数分のログインボタン -->
+            <div th:if="${not #lists.isEmpty(providers)}" class="d-grid gap-2">
+                <a th:each="p : ${providers}"
+                   th:href="@{'/oauth2/authorization/' + ${p.providerId}}"
+                   class="btn btn-primary btn-login">
                     <i class="bi bi-box-arrow-in-right me-2"></i>
-                    <span th:text="#{system.login.button}">Sign in</span>
+                    <span th:text="${p.displayName}">Provider Name</span>
                 </a>
+            </div>
+
+            <!-- プロバイダーが0件の場合：設定異常の警告 -->
+            <div th:if="${#lists.isEmpty(providers)}" class="alert alert-warning small mb-0" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{system.login.error.noProviderAvailable}">
+                    No OIDC providers are currently available. Please contact your administrator.
+                </span>
             </div>
         </div>
     </div>

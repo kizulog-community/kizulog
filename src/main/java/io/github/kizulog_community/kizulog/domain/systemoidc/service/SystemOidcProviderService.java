@@ -16,7 +16,9 @@ import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.EnabledProviderView;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProviderStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
@@ -232,12 +234,7 @@ public class SystemOidcProviderService {
         }
 
         // 「最低1つENABLED」制約: このプロバイダーを除いた他のENABLED一覧が1件以上あること
-        List<String> enabledIds =
-                statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED);
-        long otherEnabledCount = enabledIds.stream()
-                .filter(id -> !id.equals(providerId))
-                .count();
-        if (otherEnabledCount == 0) {
+        if (countOtherEnabled(providerId) == 0) {
             throw new OidcProviderException(OidcProviderError.LAST_ENABLED_REQUIRED);
         }
 
@@ -249,6 +246,55 @@ public class SystemOidcProviderService {
                 reason,
                 now,
                 updatedBy));
+    }
+
+    /**
+     * 指定プロバイダーを除いて、現在ENABLEDな他のプロバイダー数を取得する。
+     *
+     * <p>UI事前ガード（「最後の1件は無効化できない」を画面側で表現する）と、
+     * disable() 時のサーバー側制約チェックの両方で使用される。</p>
+     *
+     * <p>戻り値が 0 ならば、 excludingProviderId を無効化すると ENABLED が
+     * 1件もなくなることを意味する。1以上ならば、excludingProviderId を
+     * 無効化しても他にENABLEDが残るため、無効化操作が許される。</p>
+     *
+     * @param excludingProviderId 除外するプロバイダーID（通常は無効化対象）
+     * @return ENABLED状態の他のプロバイダー数
+     */
+    @Transactional(readOnly = true)
+    public int countOtherEnabled(String excludingProviderId) {
+        List<String> enabledIds =
+                statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED);
+        return (int) enabledIds.stream()
+                .filter(id -> !id.equals(excludingProviderId))
+                .count();
+    }
+
+    /**
+     * ログイン画面表示用に、ENABLEDな全プロバイダーを軽量ビューで取得する。
+     *
+     * <p>未認証画面で表示するため、client_secret等の機密情報は一切含めない。
+     * provider_id と displayName のみを保持した軽量ビューを返す。</p>
+     *
+     * <p>並び順は displayName の大小文字無視・自然順。
+     * 該当プロバイダーが0件の場合は空リストを返す。</p>
+     *
+     * @return ENABLEDなプロバイダーの軽量Viewリスト
+     */
+    @Transactional(readOnly = true)
+    public List<EnabledProviderView> listEnabledForLogin() {
+        List<String> enabledProviderIds =
+                statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED);
+
+        return enabledProviderIds.stream()
+                .map(providerRepository::findLatestByProviderId)
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(p -> new EnabledProviderView(p.getProviderId(), p.getDisplayName()))
+                .sorted(Comparator.comparing(
+                        EnabledProviderView::getDisplayName,
+                        Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
+                .toList();
     }
 
     /**
@@ -266,10 +312,10 @@ public class SystemOidcProviderService {
                 .map(p -> new ProviderWithStatus(p, statusMap.get(p.getProviderId())))
                 .sorted(Comparator
                         .<ProviderWithStatus, Integer>comparing(pws ->
-                                pws.status() != null
-                                        && pws.status().getStatus() == OidcProviderStatusValue.ENABLED
+                                pws.getStatus() != null
+                                        && pws.getStatus().getStatus() == OidcProviderStatusValue.ENABLED
                                         ? 0 : 1)
-                        .thenComparing(pws -> pws.provider().getDisplayName(),
+                        .thenComparing(pws -> pws.getProvider().getDisplayName(),
                                 Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER)))
                 .toList();
     }
@@ -297,30 +343,6 @@ public class SystemOidcProviderService {
                 provider.getUri(),
                 provider.getClientId(),
                 cryptoPort.decrypt(provider.getClientSecret()));
-    }
-
-    /**
-     * プロバイダーと最新ステータスのペアを表現する不変オブジェクト。
-     */
-    public static final class ProviderWithStatus {
-
-        private final SystemOidcProvider provider;
-        private final SystemOidcProviderStatus status;
-
-        public ProviderWithStatus(
-                SystemOidcProvider provider, SystemOidcProviderStatus status) {
-            this.provider = provider;
-            this.status = status;
-        }
-
-        public SystemOidcProvider provider() {
-            return provider;
-        }
-
-        public SystemOidcProviderStatus status() {
-            return status;
-        }
-
     }
 
 }

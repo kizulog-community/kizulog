@@ -23,12 +23,13 @@ import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.EnabledProviderView;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProviderStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
 import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderStatusRepository;
-import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService.ProviderWithStatus;
 
 /**
  * SystemOidcProviderServiceの単体テスト
@@ -488,9 +489,9 @@ class SystemOidcProviderServiceTest {
         List<ProviderWithStatus> result = service.listAll();
 
         assertThat(result).hasSize(3);
-        assertThat(result.get(0).provider().getProviderId()).isEqualTo("azure");
-        assertThat(result.get(1).provider().getProviderId()).isEqualTo("master");
-        assertThat(result.get(2).provider().getProviderId()).isEqualTo("google");
+        assertThat(result.get(0).getProvider().getProviderId()).isEqualTo("azure");
+        assertThat(result.get(1).getProvider().getProviderId()).isEqualTo("master");
+        assertThat(result.get(2).getProvider().getProviderId()).isEqualTo("google");
     }
 
     @Test
@@ -517,8 +518,8 @@ class SystemOidcProviderServiceTest {
         Optional<ProviderWithStatus> result = service.findDetailByProviderId("master");
 
         assertThat(result).isPresent();
-        assertThat(result.get().provider()).isEqualTo(provider);
-        assertThat(result.get().status()).isEqualTo(status);
+        assertThat(result.get().getProvider()).isEqualTo(provider);
+        assertThat(result.get().getStatus()).isEqualTo(status);
     }
 
     @Test
@@ -545,8 +546,8 @@ class SystemOidcProviderServiceTest {
         Optional<ProviderWithStatus> result = service.findDetailByProviderId("master");
 
         assertThat(result).isPresent();
-        assertThat(result.get().provider()).isEqualTo(provider);
-        assertThat(result.get().status()).isNull();
+        assertThat(result.get().getProvider()).isEqualTo(provider);
+        assertThat(result.get().getStatus()).isNull();
     }
 
     @Test
@@ -700,6 +701,148 @@ class SystemOidcProviderServiceTest {
                 .isEqualTo(OidcProviderError.LAST_ENABLED_REQUIRED);
 
         verify(statusRepository, never()).save(any());
+    }
+
+    // ===== listEnabledForLogin =====
+
+    @Test
+    @DisplayName("listEnabledForLogin: ENABLEDが0件の場合、空リストを返す")
+    void listEnabledForLogin_returnsEmpty_whenNoEnabledProviders() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of());
+
+        List<EnabledProviderView> result = service.listEnabledForLogin();
+
+        assertThat(result).isEmpty();
+        verify(providerRepository, never()).findLatestByProviderId(any());
+    }
+
+    @Test
+    @DisplayName("listEnabledForLogin: ENABLEDが1件の場合、1件返却され providerId/displayName が含まれる")
+    void listEnabledForLogin_returnsOne_whenSingleEnabledProvider() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master"));
+        SystemOidcProvider master = providerOf("master", BASE_TIME, "enc-secret");
+        when(providerRepository.findLatestByProviderId("master"))
+                .thenReturn(Optional.of(master));
+
+        List<EnabledProviderView> result = service.listEnabledForLogin();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getProviderId()).isEqualTo("master");
+        assertThat(result.get(0).getDisplayName()).isEqualTo("Display master");
+    }
+
+    @Test
+    @DisplayName("listEnabledForLogin: ENABLEDが複数の場合、displayName昇順で返却（大小文字無視）")
+    void listEnabledForLogin_returnsMultiple_sortedByDisplayName() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("zoom", "google", "azure"));
+
+        SystemOidcProvider zoom = new SystemOidcProvider(
+                "zoom", BASE_TIME, "Zoom OIDC", "u-z", "c-z", "s-z",
+                BASE_TIME, "u");
+        SystemOidcProvider google = new SystemOidcProvider(
+                "google", BASE_TIME, "google workspace", "u-g", "c-g", "s-g",
+                BASE_TIME, "u");
+        SystemOidcProvider azure = new SystemOidcProvider(
+                "azure", BASE_TIME, "Azure AD", "u-a", "c-a", "s-a",
+                BASE_TIME, "u");
+
+        when(providerRepository.findLatestByProviderId("zoom")).thenReturn(Optional.of(zoom));
+        when(providerRepository.findLatestByProviderId("google")).thenReturn(Optional.of(google));
+        when(providerRepository.findLatestByProviderId("azure")).thenReturn(Optional.of(azure));
+
+        List<EnabledProviderView> result = service.listEnabledForLogin();
+
+        assertThat(result).hasSize(3);
+        // 大小文字無視で Azure AD → google workspace → Zoom OIDC の順
+        assertThat(result.get(0).getProviderId()).isEqualTo("azure");
+        assertThat(result.get(1).getProviderId()).isEqualTo("google");
+        assertThat(result.get(2).getProviderId()).isEqualTo("zoom");
+    }
+
+    @Test
+    @DisplayName("listEnabledForLogin: DISABLEDなプロバイダーは含まれない")
+    void listEnabledForLogin_excludesDisabledProviders() {
+        // statusRepository.findProviderIdsByLatestStatus(ENABLED) は ENABLED のIDのみ返すため、
+        // master が ENABLED、google が DISABLED の場合、ENABLEDクエリは ["master"] のみ返す
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master"));
+        SystemOidcProvider master = providerOf("master", BASE_TIME, "enc-secret");
+        when(providerRepository.findLatestByProviderId("master"))
+                .thenReturn(Optional.of(master));
+
+        List<EnabledProviderView> result = service.listEnabledForLogin();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getProviderId()).isEqualTo("master");
+        // google は呼ばれない
+        verify(providerRepository, never()).findLatestByProviderId("google");
+    }
+
+    @Test
+    @DisplayName("listEnabledForLogin: ENABLED IDがあるが対応プロバイダーが見つからない場合、その項目はスキップ")
+    void listEnabledForLogin_skipsMissingProvider() {
+        // statusはENABLEDだがproviderRepositoryに該当なし（データ不整合の保険）
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master", "ghost"));
+        SystemOidcProvider master = providerOf("master", BASE_TIME, "enc-secret");
+        when(providerRepository.findLatestByProviderId("master"))
+                .thenReturn(Optional.of(master));
+        when(providerRepository.findLatestByProviderId("ghost"))
+                .thenReturn(Optional.empty());
+
+        List<EnabledProviderView> result = service.listEnabledForLogin();
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getProviderId()).isEqualTo("master");
+    }
+
+    // ===== countOtherEnabled =====
+
+    @Test
+    @DisplayName("countOtherEnabled: ENABLEDが0件の場合、除外指定があっても0を返す")
+    void countOtherEnabled_returnsZero_whenNoEnabledProviders() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of());
+
+        int result = service.countOtherEnabled("master");
+
+        assertThat(result).isZero();
+    }
+
+    @Test
+    @DisplayName("countOtherEnabled: ENABLEDがmaster1件のみで、除外もmasterの場合、0を返す")
+    void countOtherEnabled_returnsZero_whenOnlyExcludedIsEnabled() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master"));
+
+        int result = service.countOtherEnabled("master");
+
+        assertThat(result).isZero();
+    }
+
+    @Test
+    @DisplayName("countOtherEnabled: ENABLEDが複数あり、除外されるIDが含まれない場合、ENABLED総数を返す")
+    void countOtherEnabled_returnsAllEnabled_whenExcludedIsNotInList() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master", "google", "azure"));
+
+        int result = service.countOtherEnabled("not-in-list");
+
+        assertThat(result).isEqualTo(3);
+    }
+
+    @Test
+    @DisplayName("countOtherEnabled: ENABLEDが3件あり、除外IDが含まれる場合、2を返す")
+    void countOtherEnabled_excludesSpecifiedId() {
+        when(statusRepository.findProviderIdsByLatestStatus(OidcProviderStatusValue.ENABLED))
+                .thenReturn(List.of("master", "google", "azure"));
+
+        int result = service.countOtherEnabled("google");
+
+        assertThat(result).isEqualTo(2);
     }
 
 }
