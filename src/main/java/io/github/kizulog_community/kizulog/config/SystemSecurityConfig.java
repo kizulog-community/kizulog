@@ -17,6 +17,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 
+import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.infrastructure.security.client.DynamicSystemClientRegistrationRepository;
 import io.github.kizulog_community.kizulog.infrastructure.security.oidc.SystemOidcUserService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
@@ -35,10 +36,18 @@ import jakarta.servlet.http.HttpServletResponse;
  *
  * <p>担当URL:
  * <ul>
- *   <li>/system/**: システム管理画面（/system/loginを除き認証必須）</li>
- *   <li>/oauth2/authorization/**: OAuth2認可開始（Spring Security固定パス）</li>
- *   <li>/login/oauth2/code/**: OAuth2コールバック（Spring Security固定パス）</li>
- *   <li>/logout: ログアウト</li>
+ * <li>/system/invite/**        - 招待受諾フロー（認証不要）</li>
+ * <li>/system/**               - システム管理画面（/system/loginを除き認証必須）</li>
+ * <li>/oauth2/authorization/** - OAuth2認可開始（Spring Security固定パス）</li>
+ * <li>/login/oauth2/code/**    - OAuth2コールバック（Spring Security固定パス）</li>
+ * <li>/logout                  - ログアウト</li>
+ * </ul>
+ *
+ * <p>認証失敗ハンドラ:
+ * OAuth2AuthenticationExceptionのerrorCodeを判定して、
+ * <ul>
+ * <li>InvitationError系（IDENTITY_EXISTS, INVITATION_NOT_FOUND等）→ /system/invite/error?code={errorCode}にリダイレクト</li>
+ * <li>それ以外                                                    → /system/login?error={errorCode}にリダイレクト</li>
  * </ul>
  *
  * @author Jun Kobayashi
@@ -74,6 +83,8 @@ public class SystemSecurityConfig {
             .authorizeHttpRequests(auth -> auth
                 // ログインページとOAuth2フロー関連は認証不要
                 .requestMatchers("/system/login").permitAll()
+                // 招待受諾フロー(I.0)は認証不要
+                .requestMatchers("/system/invite/**").permitAll()
                 .requestMatchers("/oauth2/authorization/**").permitAll()
                 .requestMatchers("/login/oauth2/code/**").permitAll()
                 // それ以外の/system/**はSYSTEM_ADMINロール必須
@@ -107,10 +118,12 @@ public class SystemSecurityConfig {
     /**
      * 認証失敗時のハンドラ
      *
-     * <p>OAuth2AuthenticationExceptionの場合はerrorCodeをクエリパラメータとして
-     * /system/login?error=<errorCode>にリダイレクトする。
-     * これによりSystemLoginControllerが詳細エラーメッセージを判別できる。
-     * クエリ値はURLエンコードされる。SystemLoginController側でホワイトリスト検証する前提。</p>
+     * <p>OAuth2AuthenticationExceptionのerrorCodeで宛先を分岐する。
+     * <ul>
+     * <li>InvitationError系 → /system/invite/error?code={errorCode}</li>
+     * <li>それ以外 → /system/login?error={errorCode}</li>
+     * </ul>
+     * クエリ値はURLエンコードされる。各遷移先側でホワイトリスト検証する前提。</p>
      *
      * @return AuthenticationFailureHandler
      */
@@ -122,15 +135,18 @@ public class SystemSecurityConfig {
      * 認証失敗時のハンドラ実装
      *
      * <p>OAuth2AuthenticationExceptionからerrorCodeを抽出してリダイレクトURLに付与する。
-     * それ以外の例外は単純な?errorとしてリダイレクトする。</p>
+     * InvitationError由来のerrorCodeは招待エラー画面へ、それ以外はログイン画面エラーへ振り分ける。</p>
      */
     static class SystemAuthenticationFailureHandler implements AuthenticationFailureHandler {
 
         /** デフォルトのリダイレクト先（エラーコード不明時） */
         private static final String DEFAULT_FAILURE_URL = "/system/login?error";
 
-        /** エラーコード付きのリダイレクト先テンプレート */
-        private static final String FAILURE_URL_WITH_CODE = "/system/login?error=";
+        /** ログインエラー時のリダイレクト先テンプレート */
+        private static final String LOGIN_FAILURE_URL_WITH_CODE = "/system/login?error=";
+
+        /** 招待エラー時のリダイレクト先テンプレート */
+        private static final String INVITE_FAILURE_URL_WITH_CODE = "/system/invite/error?code=";
 
         @Override
         public void onAuthenticationFailure(
@@ -142,11 +158,29 @@ public class SystemSecurityConfig {
             if (exception instanceof OAuth2AuthenticationException oae) {
                 String errorCode = oae.getError().getErrorCode();
                 if (errorCode != null && !errorCode.isBlank()) {
-                    redirectUrl = FAILURE_URL_WITH_CODE
-                            + URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
+                    String encoded = URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
+                    if (isInvitationError(errorCode)) {
+                        redirectUrl = INVITE_FAILURE_URL_WITH_CODE + encoded;
+                    } else {
+                        redirectUrl = LOGIN_FAILURE_URL_WITH_CODE + encoded;
+                    }
                 }
             }
             response.sendRedirect(request.getContextPath() + redirectUrl);
+        }
+
+        /**
+         * エラーコードが InvitationError 由来か判定する。
+         *
+         * <p>InvitationError のenum名と完全一致する場合のみ true。</p>
+         */
+        private boolean isInvitationError(String errorCode) {
+            for (InvitationError e : InvitationError.values()) {
+                if (e.name().equals(errorCode)) {
+                    return true;
+                }
+            }
+            return false;
         }
 
     }

@@ -3,13 +3,18 @@ package io.github.kizulog_community.kizulog.infrastructure.security.oidc;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -23,10 +28,16 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
+import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationException;
+import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.InvitationAcceptanceService;
+import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.SystemAdminInvitationService;
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationErrorType;
 import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAuthenticationException;
 import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemAuthenticationService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
+import io.github.kizulog_community.kizulog.infrastructure.web.system.invite.InvitationAcceptanceSession;
 
 /**
  * SystemOidcUserServiceの単体テスト
@@ -40,21 +51,40 @@ class SystemOidcUserServiceTest {
     private static final String SUB = "user-uuid-123";
     private static final String ACCOUNT_ID = "acc-1";
     private static final String IDENTITY_ID = "identity-1";
+    private static final String INVITATION_ID = "invite-1";
     private static final OffsetDateTime VERSION =
             OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
     private SystemAuthenticationService authService;
+    private SystemAccountIdentityRepository identityRepository;
+    private InvitationAcceptanceService invitationAcceptanceService;
+    private SystemAdminInvitationService invitationService;
+    private InvitationAcceptanceSession invitationSession;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private SystemOidcUserService sut;
 
     @BeforeEach
     void setUp() {
         authService = mock(SystemAuthenticationService.class);
+        identityRepository = mock(SystemAccountIdentityRepository.class);
+        invitationAcceptanceService = mock(InvitationAcceptanceService.class);
+        invitationService = mock(SystemAdminInvitationService.class);
+        invitationSession = mock(InvitationAcceptanceSession.class);
         @SuppressWarnings("unchecked")
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
                 mock(OAuth2UserService.class);
         delegate = mockDelegate;
-        sut = new SystemOidcUserService(authService, delegate);
+
+        // 既定: 招待ペンディングなし(通常ログインフロー)
+        when(invitationSession.isPending()).thenReturn(false);
+
+        sut = new SystemOidcUserService(
+                authService,
+                identityRepository,
+                invitationAcceptanceService,
+                invitationService,
+                invitationSession,
+                delegate);
     }
 
     /**
@@ -106,8 +136,14 @@ class SystemOidcUserServiceTest {
                 VERSION, "system:setup");
     }
 
+    private SystemAccountIdentity newlyCreatedIdentity() {
+        return new SystemAccountIdentity(
+                "new-identity-id", VERSION, "new-account-id", ISS, AUD, SUB,
+                VERSION, "system:invite:" + INVITATION_ID);
+    }
+
     @Test
-    @DisplayName("loadUser: 認証成功時、SystemUserPrincipalが返る（accountId/identityId/iss/aud/sub）")
+    @DisplayName("loadUser: 通常ログインフロー - 認証成功時、SystemUserPrincipalが返る（accountId/identityId/iss/aud/sub）")
     void loadUser_succeeds_returnsSystemUserPrincipal() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -126,7 +162,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: 認証成功時、authoritiesにROLE_SYSTEM_ADMINが含まれる")
+    @DisplayName("loadUser: 通常ログインフロー - 認証成功時、authoritiesにROLE_SYSTEM_ADMINが含まれる")
     void loadUser_succeeds_authoritiesContainsSystemAdminRole() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -141,7 +177,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: authServiceにiss/aud/subが正しく渡される")
+    @DisplayName("loadUser: 通常ログインフロー - authServiceにiss/aud/subが正しく渡される")
     void loadUser_callsAuthServiceWithCorrectArguments() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -154,7 +190,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: ACCOUNT_NOT_FOUND時、OAuth2AuthenticationExceptionに変換")
+    @DisplayName("loadUser: 通常ログインフロー - ACCOUNT_NOT_FOUND時、OAuth2AuthenticationExceptionに変換")
     void loadUser_throwsOAuth2AuthException_whenAccountNotFound() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -170,7 +206,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: IDENTITY_INACTIVE時、OAuth2AuthenticationExceptionに変換")
+    @DisplayName("loadUser: 通常ログインフロー - IDENTITY_INACTIVE時、OAuth2AuthenticationExceptionに変換")
     void loadUser_throwsOAuth2AuthException_whenIdentityInactive() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -186,7 +222,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: ACCOUNT_INACTIVE時、OAuth2AuthenticationExceptionに変換")
+    @DisplayName("loadUser: 通常ログインフロー - ACCOUNT_INACTIVE時、OAuth2AuthenticationExceptionに変換")
     void loadUser_throwsOAuth2AuthException_whenAccountInactive() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -202,7 +238,7 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
-    @DisplayName("loadUser: ROLE_NOT_GRANTED時、OAuth2AuthenticationExceptionに変換")
+    @DisplayName("loadUser: 通常ログインフロー - ROLE_NOT_GRANTED時、OAuth2AuthenticationExceptionに変換")
     void loadUser_throwsOAuth2AuthException_whenRoleNotGranted() {
         OidcUser oidcUser = buildOidcUser();
         OidcUserRequest userRequest = buildUserRequest();
@@ -227,6 +263,168 @@ class SystemOidcUserServiceTest {
 
         assertThatThrownBy(() -> sut.loadUser(userRequest))
                 .isSameAs(delegateException);
+    }
+
+    @Test
+    @DisplayName("loadUser: 通常ログインフロー - 招待関連サービスは呼ばれない")
+    void loadUser_doesNotCallInvitationServices_whenStandardLogin() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(identity());
+
+        sut.loadUser(userRequest);
+
+        verify(invitationAcceptanceService, never())
+                .acceptInvitation(anyString(), anyString(), anyString(), anyString());
+        verify(invitationService, never())
+                .cancelInvitation(anyString(), anyString(), anyString());
+        verify(identityRepository, never())
+                .findLatestByIssAndAudAndSub(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - identity未存在の新規受諾者、acceptInvitationが呼ばれsession.clear()される")
+    void loadUser_invitationFlow_createsNewAccount_whenIdentityNotExists() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.empty());
+        when(invitationAcceptanceService.acceptInvitation(INVITATION_ID, ISS, AUD, SUB))
+                .thenReturn(newlyCreatedIdentity());
+
+        OidcUser result = sut.loadUser(userRequest);
+
+        // SystemUserPrincipal返却
+        assertThat(result).isInstanceOf(SystemUserPrincipal.class);
+        SystemUserPrincipal principal = (SystemUserPrincipal) result;
+        assertThat(principal.getAccountId()).isEqualTo("new-account-id");
+        assertThat(principal.getIdentityId()).isEqualTo("new-identity-id");
+        assertThat(principal.getIss()).isEqualTo(ISS);
+
+        // 認証Serviceは呼ばれない
+        verify(authService, never()).authenticate(anyString(), anyString(), anyString());
+        // 受諾Serviceは呼ばれる
+        verify(invitationAcceptanceService).acceptInvitation(INVITATION_ID, ISS, AUD, SUB);
+        // セッションはクリアされる
+        verify(invitationSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - identity既存ユーザーの招待は自動取消されIDENTITY_EXISTSエラー")
+    void loadUser_invitationFlow_throwsIdentityExists_whenIdentityAlreadyExists() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.of(identity()));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(InvitationError.IDENTITY_EXISTS.name());
+
+        // 招待は自動取消される
+        verify(invitationService).cancelInvitation(
+                eq(INVITATION_ID), anyString(), eq("system:auto-cancel"));
+        // アカウント作成は呼ばれない
+        verify(invitationAcceptanceService, never())
+                .acceptInvitation(anyString(), anyString(), anyString(), anyString());
+        // セッションはクリアされる
+        verify(invitationSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - 自動取消が失敗してもIDENTITY_EXISTSエラーは継続(同時アクセス耐性)")
+    void loadUser_invitationFlow_continuesWhenAutoCancelFails() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.of(identity()));
+        // 自動取消失敗(既にCANCELLED/USED等)
+        doThrow(new InvitationException(InvitationError.ALREADY_CANCELLED))
+                .when(invitationService).cancelInvitation(
+                        anyString(), anyString(), anyString());
+
+        // それでもIDENTITY_EXISTSはthrowされる
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(InvitationError.IDENTITY_EXISTS.name());
+
+        // セッションはクリアされる
+        verify(invitationSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - acceptInvitationが失敗時、INVITATION_NOT_FOUNDで変換されsession.clear()される")
+    void loadUser_invitationFlow_throwsInvitationNotFound_whenAcceptanceFails() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.empty());
+        // 受諾処理で例外発生(例: 同時アクセスで既にUSED化された)
+        when(invitationAcceptanceService.acceptInvitation(
+                INVITATION_ID, ISS, AUD, SUB))
+                .thenThrow(new InvitationException(InvitationError.ALREADY_USED));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(InvitationError.INVITATION_NOT_FOUND.name());
+
+        // セッションはクリアされる
+        verify(invitationSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - delegate.loadUserがOAuth2AuthExceptionを投げた場合はそのまま伝播(セッションは触らない)")
+    void loadUser_invitationFlow_propagatesDelegateException() {
+        OidcUserRequest userRequest = buildUserRequest();
+        OAuth2AuthenticationException delegateException =
+                new OAuth2AuthenticationException("invalid_token");
+        when(delegate.loadUser(any())).thenThrow(delegateException);
+        // session.isPending()はdelegate呼び出し後の処理で評価されるため、ここでは
+        // delegate例外が先に発生してsession判定にすら到達しない。
+        when(invitationSession.isPending()).thenReturn(true);
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isSameAs(delegateException);
+
+        // session判定にすら到達していないため、clearは呼ばれない
+        verify(invitationSession, never()).clear();
+        // 受諾Serviceも呼ばれない
+        verify(invitationAcceptanceService, never())
+                .acceptInvitation(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待受諾フロー - 認証Service(authenticate)は呼ばれない")
+    void loadUser_invitationFlow_doesNotCallStandardAuthService() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.empty());
+        when(invitationAcceptanceService.acceptInvitation(INVITATION_ID, ISS, AUD, SUB))
+                .thenReturn(newlyCreatedIdentity());
+
+        sut.loadUser(userRequest);
+
+        verify(authService, never()).authenticate(anyString(), anyString(), anyString());
     }
 
 }

@@ -1,16 +1,11 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="ja">
-<head>
-    <meta charset="UTF-8" />
-    <title>(layout.html - direct access not intended)</title>
-</head>
-<body>
 
 <!-- ============================================================ -->
 <!-- head フラグメント: 共通CSS/meta                              -->
 <!-- 呼び出し側で <head th:replace="~{system/fragments/layout :: head(title='...')}"> -->
 <!-- ============================================================ -->
-<th:block th:fragment="head(title)">
+<head th:fragment="head(title)">
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="_csrf" th:content="${_csrf?.token}" />
@@ -77,7 +72,9 @@
             border: 1px solid #dee2e6;
         }
     </style>
-</th:block>
+</head>
+
+<body>
 
 <!-- ============================================================ -->
 <!-- header フラグメント: ヘッダ                                  -->

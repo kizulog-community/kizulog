@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.invitations.list.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='accounts')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/accounts}"
+                           th:text="#{system.menu.accounts}">アカウント管理</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.invitations.list.breadcrumb}">招待管理</li>
+                </ol>
+            </nav>
+
+            <!-- ヘッダー -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-envelope-paper me-2"></i>
+                    <span th:text="#{system.invitations.list.title}">招待管理</span>
+                </h1>
+                <a th:href="@{/system/accounts/invitations/new}" class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i>
+                    <span th:text="#{system.invitations.list.button.add}">新規招待</span>
+                </a>
+            </div>
+
+            <!-- 一覧外フラッシュメッセージ -->
+            <div th:if="${flashErrorKey}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{__${flashErrorKey}__}">エラー</span>
+            </div>
+
+            <!-- 説明 -->
+            <p class="text-muted small mb-3" th:text="#{system.invitations.list.description}">
+                新規システム管理者を招待するための一覧です。発行した招待URLは初回表示時のみ取得可能です。
+            </p>
+
+            <!-- テーブル -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th th:text="#{system.invitations.list.column.displayName}">表示名</th>
+                            <th th:text="#{system.invitations.list.column.status}">ステータス</th>
+                            <th th:text="#{system.invitations.list.column.createdAt}">作成日時</th>
+                            <th th:text="#{system.invitations.list.column.expiresAt}">有効期限</th>
+                            <th class="text-end" th:text="#{system.invitations.list.column.actions}">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${items}">
+                            <td>
+                                <span th:text="${item.displayName}">表示名</span>
+                            </td>
+                            <td>
+                                <!-- PENDING かつ 期限内 -->
+                                <span th:if="${item.status.name() == 'PENDING' and !item.expired}"
+                                      class="badge text-bg-primary"
+                                      th:text="#{system.invitations.status.PENDING}">受諾待ち</span>
+                                <!-- PENDING かつ 期限切れ -->
+                                <span th:if="${item.status.name() == 'PENDING' and item.expired}"
+                                      class="badge text-bg-secondary"
+                                      th:text="#{system.invitations.status.EXPIRED}">期限切れ</span>
+                                <!-- USED -->
+                                <span th:if="${item.status.name() == 'USED'}"
+                                      class="badge text-bg-success"
+                                      th:text="#{system.invitations.status.USED}">使用済</span>
+                                <!-- CANCELLED -->
+                                <span th:if="${item.status.name() == 'CANCELLED'}"
+                                      class="badge text-bg-dark"
+                                      th:text="#{system.invitations.status.CANCELLED}">取消済</span>
+                            </td>
+                            <td>
+                                <span th:text="${#temporals.format(item.createdAt, 'yyyy-MM-dd HH:mm')}">
+                                    2026-05-14 09:00
+                                </span>
+                            </td>
+                            <td>
+                                <span th:text="${#temporals.format(item.expiresAt, 'yyyy-MM-dd HH:mm')}">
+                                    2026-05-15 09:00
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a th:href="@{'/system/accounts/invitations/' + ${item.invitationId}}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                    <span th:text="#{system.invitations.list.action.detail}">詳細</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(items)}">
+                            <td colspan="5" class="text-center text-muted py-4"
+                                th:text="#{system.invitations.list.empty}">
+                                該当する招待はありません。
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+</body>
+</html>

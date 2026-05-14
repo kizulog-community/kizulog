@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
 <head th:replace="~{system/fragments/layout :: head(title=#{system.accounts.title})}">
     <!-- layout.htmlの::headで置き換えられる -->
 </head>
@@ -21,13 +21,52 @@
                     </h1>
                 </div>
 
-                <div class="card">
-                    <div class="card-body text-center py-5">
-                        <i class="bi bi-tools text-primary" style="font-size: 3rem;"></i>
-                        <h5 class="mt-3" th:text="#{system.common.comingSoon.title}">Coming Soon</h5>
-                        <p class="text-muted mb-0" th:text="#{system.accounts.comingSoon.description}">
-                            アカウント管理機能は現在実装中です。
-                        </p>
+                <p class="text-muted small mb-4" th:text="#{system.accounts.description}">
+                    システム管理者アカウントの管理を行います。
+                </p>
+
+                <div class="row g-3">
+                    <!-- 招待管理カード(I.0で追加) -->
+                    <div class="col-md-6 col-lg-4">
+                        <a th:href="@{/system/accounts/invitations}"
+                           class="card text-decoration-none text-reset h-100 shadow-sm">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-envelope-paper text-primary me-2"
+                                       style="font-size: 1.5rem;"></i>
+                                    <h5 class="card-title mb-0"
+                                        th:text="#{system.accounts.feature.invitations.title}">
+                                        招待管理
+                                    </h5>
+                                </div>
+                                <p class="card-text small text-muted mb-0"
+                                   th:text="#{system.accounts.feature.invitations.description}">
+                                    新規システム管理者の招待リンクを発行・管理します。
+                                </p>
+                            </div>
+                        </a>
+                    </div>
+
+                    <!-- アカウント一覧カード(Coming Soon) -->
+                    <div class="col-md-6 col-lg-4">
+                        <div class="card h-100 shadow-sm opacity-50">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-2">
+                                    <i class="bi bi-person-lines-fill text-secondary me-2"
+                                       style="font-size: 1.5rem;"></i>
+                                    <h5 class="card-title mb-0"
+                                        th:text="#{system.accounts.feature.list.title}">
+                                        アカウント一覧
+                                    </h5>
+                                    <span class="badge text-bg-secondary ms-2 small"
+                                          th:text="#{system.common.comingSoon.badge}">Coming Soon</span>
+                                </div>
+                                <p class="card-text small text-muted mb-0"
+                                   th:text="#{system.accounts.feature.list.description}">
+                                    登録済みシステム管理者の一覧を表示します。
+                                </p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
