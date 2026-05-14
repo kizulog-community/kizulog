@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.localization.edit.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='system-settings')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings}"
+                               th:text="#{system.systemSettings.title}">システム管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings/localization}"
+                               th:text="#{system.localization.detail.breadcrumb}">言語・タイムゾーン</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.localization.edit.breadcrumb}">編集</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-translate me-2"></i>
+                        <span th:text="#{system.localization.edit.title}">言語・タイムゾーン設定編集</span>
+                    </h1>
+                </div>
+
+                <!-- 編集フォーム -->
+                <form th:action="@{/system/system-settings/localization}"
+                      th:object="${localizationEditForm}"
+                      method="post"
+                      id="localizationForm"
+                      novalidate>
+
+                    <!-- グローバルエラー（クロスフィールド検証等） -->
+                    <div th:if="${#fields.hasGlobalErrors()}"
+                         class="alert alert-danger small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <ul class="mb-0">
+                            <li th:each="err : ${#fields.globalErrors()}"
+                                th:text="${err}">エラー</li>
+                        </ul>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 言語設定                                                      -->
+                    <!-- ============================================================ -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-chat-left-text me-2"></i>
+                                <span th:text="#{system.localization.edit.section.language}">言語設定</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- 利用可能言語 -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-check2-square me-1"></i>
+                                    <span th:text="#{system.localization.field.availableLanguages}">利用可能言語</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="border rounded p-3 bg-light"
+                                     th:classappend="${#fields.hasErrors('availableLanguages')} ? 'border-danger' : ''">
+                                    <div th:each="lang : ${T(io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage).values()}"
+                                         class="form-check">
+                                        <input type="checkbox" class="form-check-input lang-checkbox"
+                                               name="availableLanguages"
+                                               th:value="${lang.name()}"
+                                               th:id="${'lang-' + lang.name()}"
+                                               th:data-name="${lang.displayName}"
+                                               th:checked="${localizationEditForm.availableLanguages != null and localizationEditForm.availableLanguages.contains(lang)}"/>
+                                        <label class="form-check-label"
+                                               th:for="${'lang-' + lang.name()}"
+                                               th:text="${lang.displayName}"></label>
+                                    </div>
+                                </div>
+                                <div class="text-danger small mt-1"
+                                     th:if="${#fields.hasErrors('availableLanguages')}"
+                                     th:errors="*{availableLanguages}">エラー</div>
+                            </div>
+
+                            <!-- デフォルト言語 -->
+                            <div class="mb-0">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-translate me-1"></i>
+                                    <span th:text="#{system.localization.field.defaultLanguage}">デフォルト言語</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select name="defaultLanguage"
+                                        id="defaultLanguage"
+                                        class="form-select"
+                                        th:classappend="${#fields.hasErrors('defaultLanguage')} ? 'is-invalid' : ''"
+                                        required>
+                                </select>
+                                <div class="invalid-feedback"
+                                     th:if="${#fields.hasErrors('defaultLanguage')}"
+                                     th:errors="*{defaultLanguage}">エラー</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- タイムゾーン設定                                               -->
+                    <!-- ============================================================ -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-clock me-2"></i>
+                                <span th:text="#{system.localization.edit.section.timezone}">タイムゾーン設定</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- 利用可能タイムゾーン -->
+                            <div class="mb-3">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-check2-square me-1"></i>
+                                    <span th:text="#{system.localization.field.availableTimezones}">利用可能タイムゾーン</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <div class="border rounded p-2 bg-light"
+                                     th:classappend="${#fields.hasErrors('availableTimezones')} ? 'border-danger' : ''">
+                                    <div id="tzTagsContainer" class="d-flex flex-wrap gap-1 mb-2"></div>
+                                    <div class="position-relative">
+                                        <input type="text" class="form-control form-control-sm"
+                                               id="tzSearchInput"
+                                               th:placeholder="#{system.localization.edit.placeholder.searchTimezone}"
+                                               autocomplete="off"/>
+                                        <div id="tzDropdown"
+                                             class="position-absolute w-100 bg-white border rounded shadow-sm mt-1 d-none"
+                                             style="max-height: 240px; overflow-y: auto; z-index: 10;">
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="text-danger small mt-1"
+                                     th:if="${#fields.hasErrors('availableTimezones')}"
+                                     th:errors="*{availableTimezones}">エラー</div>
+                            </div>
+
+                            <!-- デフォルトタイムゾーン -->
+                            <div class="mb-0">
+                                <label class="form-label fw-semibold">
+                                    <i class="bi bi-clock me-1"></i>
+                                    <span th:text="#{system.localization.field.defaultTimezone}">デフォルトタイムゾーン</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <select name="defaultTimezone"
+                                        id="defaultTimezone"
+                                        class="form-select"
+                                        th:classappend="${#fields.hasErrors('defaultTimezone')} ? 'is-invalid' : ''"
+                                        required>
+                                </select>
+                                <div class="invalid-feedback"
+                                     th:if="${#fields.hasErrors('defaultTimezone')}"
+                                     th:errors="*{defaultTimezone}">エラー</div>
+                            </div>
+
+                            <!-- 選択されたタイムゾーンのhidden input配置場所 -->
+                            <div id="tzHiddenInputs"></div>
+                        </div>
+                    </div>
+
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-between mb-4">
+                        <a th:href="@{/system/system-settings/localization}"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>
+                            <span th:text="#{system.localization.edit.button.cancel}">キャンセル</span>
+                        </a>
+                        <button type="submit" class="btn btn-primary" id="saveBtn" disabled>
+                            <i class="bi bi-check-lg me-1"></i>
+                            <span th:text="#{system.localization.edit.button.save}">保存</span>
+                        </button>
+                    </div>
+                </form>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <!-- ページ固有スクリプト -->
+    <script th:inline="javascript">
+        // ============================================================
+        // サーバーから渡されるデータ
+        // ============================================================
+        const savedDefaultLang = /*[[${localizationEditForm.defaultLanguage != null ? localizationEditForm.defaultLanguage.name() : ''}]]*/ '';
+        const savedDefaultTz   = /*[[${localizationEditForm.defaultTimezone != null ? localizationEditForm.defaultTimezone.name() : ''}]]*/ '';
+
+        // 全タイムゾーンリスト（Controllerで構築済の {id, displayName} 配列）
+        const allTimezones = /*[[${timezonesJson}]]*/ [];
+
+        // 既に選択されたタイムゾーン（フォームバインドからの復元）
+        const selectedTimezones = /*[[${selectedTimezones}]]*/ [];
+
+        // ============================================================
+        // 言語のロジック（Setup Step1と同じ）
+        // ============================================================
+        function refreshSelect(checkboxClass, selectId, savedValue) {
+            const select = document.getElementById(selectId);
+            const previousValue = select.value || savedValue;
+            select.innerHTML = '';
+
+            const checked = document.querySelectorAll('.' + checkboxClass + ':checked');
+            checked.forEach(cb => {
+                const opt = document.createElement('option');
+                opt.value = cb.value;
+                opt.textContent = cb.dataset.name;
+                if (cb.value === previousValue) {
+                    opt.selected = true;
+                }
+                select.appendChild(opt);
+            });
+        }
+
+        // ============================================================
+        // タイムゾーンのタグUI（Setup Step1と同じ）
+        // ============================================================
+        const selectedTzSet = new Set(selectedTimezones.map(tz => tz.id));
+
+        function renderTzTags() {
+            const container = document.getElementById('tzTagsContainer');
+            const hiddenContainer = document.getElementById('tzHiddenInputs');
+            container.innerHTML = '';
+            hiddenContainer.innerHTML = '';
+
+            selectedTzSet.forEach(tzId => {
+                const tz = allTimezones.find(t => t.id === tzId);
+                if (!tz) return;
+
+                const tag = document.createElement('span');
+                tag.className = 'badge bg-primary d-flex align-items-center gap-1';
+                tag.style.fontSize = '0.85rem';
+                tag.innerHTML = `
+                    ${tz.displayName}
+                    <button type="button" class="btn-close btn-close-white" style="font-size: 0.65rem;"
+                            onclick="removeTz('${tz.id}')"></button>
+                `;
+                container.appendChild(tag);
+
+                const hidden = document.createElement('input');
+                hidden.type = 'hidden';
+                hidden.name = 'availableTimezones';
+                hidden.value = tz.id;
+                hiddenContainer.appendChild(hidden);
+            });
+
+            refreshDefaultTz();
+        }
+
+        function refreshDefaultTz() {
+            const select = document.getElementById('defaultTimezone');
+            const previousValue = select.value || savedDefaultTz;
+            select.innerHTML = '';
+
+            selectedTzSet.forEach(tzId => {
+                const tz = allTimezones.find(t => t.id === tzId);
+                if (!tz) return;
+                const opt = document.createElement('option');
+                opt.value = tz.id;
+                opt.textContent = tz.displayName;
+                if (tz.id === previousValue) opt.selected = true;
+                select.appendChild(opt);
+            });
+
+            updateSaveButton();
+        }
+
+        function addTz(tzId) {
+            selectedTzSet.add(tzId);
+            renderTzTags();
+            document.getElementById('tzSearchInput').value = '';
+            document.getElementById('tzDropdown').classList.add('d-none');
+        }
+
+        function removeTz(tzId) {
+            selectedTzSet.delete(tzId);
+            renderTzTags();
+        }
+
+        function searchTz(query) {
+            const dropdown = document.getElementById('tzDropdown');
+            dropdown.innerHTML = '';
+
+            if (!query) {
+                dropdown.classList.add('d-none');
+                return;
+            }
+
+            const lowerQuery = query.toLowerCase();
+            const matches = allTimezones
+                .filter(tz => !selectedTzSet.has(tz.id))
+                .filter(tz => tz.displayName.toLowerCase().includes(lowerQuery))
+                .slice(0, 50);
+
+            if (matches.length === 0) {
+                dropdown.classList.add('d-none');
+                return;
+            }
+
+            matches.forEach(tz => {
+                const item = document.createElement('div');
+                item.className = 'px-3 py-1 small';
+                item.style.cursor = 'pointer';
+                item.textContent = tz.displayName;
+                item.addEventListener('mouseenter', () => item.classList.add('bg-light'));
+                item.addEventListener('mouseleave', () => item.classList.remove('bg-light'));
+                item.addEventListener('mousedown', (e) => {
+                    e.preventDefault();
+                    addTz(tz.id);
+                });
+                dropdown.appendChild(item);
+            });
+            dropdown.classList.remove('d-none');
+        }
+
+        document.getElementById('tzSearchInput').addEventListener('input', (e) => {
+            searchTz(e.target.value);
+        });
+
+        document.getElementById('tzSearchInput').addEventListener('focus', (e) => {
+            if (e.target.value) searchTz(e.target.value);
+        });
+
+        document.getElementById('tzSearchInput').addEventListener('blur', () => {
+            setTimeout(() => {
+                document.getElementById('tzDropdown').classList.add('d-none');
+            }, 200);
+        });
+
+        // ============================================================
+        // 「保存」ボタンの有効/無効
+        // ============================================================
+        function updateSaveButton() {
+            const langChecked = document.querySelectorAll('.lang-checkbox:checked').length > 0;
+            const tzChecked   = selectedTzSet.size > 0;
+            const langSelected = document.getElementById('defaultLanguage').value !== '';
+            const tzSelected   = document.getElementById('defaultTimezone').value !== '';
+            document.getElementById('saveBtn').disabled =
+                !(langChecked && tzChecked && langSelected && tzSelected);
+        }
+
+        // 初期表示
+        refreshSelect('lang-checkbox', 'defaultLanguage', savedDefaultLang);
+        renderTzTags();
+
+        // 言語チェックボックスの変更
+        document.querySelectorAll('.lang-checkbox').forEach(cb => {
+            cb.addEventListener('change', () => {
+                refreshSelect('lang-checkbox', 'defaultLanguage', savedDefaultLang);
+                updateSaveButton();
+            });
+        });
+
+        document.getElementById('defaultLanguage').addEventListener('change', updateSaveButton);
+        document.getElementById('defaultTimezone').addEventListener('change', updateSaveButton);
+    </script>
+
+</body>
+</html>

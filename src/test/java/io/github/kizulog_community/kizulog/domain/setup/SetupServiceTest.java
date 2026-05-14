@@ -1,23 +1,18 @@
 package io.github.kizulog_community.kizulog.domain.setup;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
 
+import java.time.OffsetDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
-
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
@@ -35,8 +30,9 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
-import io.github.kizulog_community.kizulog.domain.systemconfig.model.SystemConfig;
-import io.github.kizulog_community.kizulog.domain.systemconfig.port.SystemConfigRepository;
+import io.github.kizulog_community.kizulog.domain.systemconfig.model.LanguageSetting;
+import io.github.kizulog_community.kizulog.domain.systemconfig.model.TimezoneSetting;
+import io.github.kizulog_community.kizulog.domain.systemconfig.service.LocalizationSettingService;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
 import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.OidcSetting;
@@ -49,7 +45,6 @@ import io.github.kizulog_community.kizulog.infrastructure.web.setup.SetupSession
  */
 class SetupServiceTest {
 
-    private SystemConfigRepository systemConfigRepository;
     private SystemAccountRepository systemAccountRepository;
     private SystemAccountStatusRepository systemAccountStatusRepository;
     private SystemAccountIdentityRepository systemAccountIdentityRepository;
@@ -57,12 +52,11 @@ class SetupServiceTest {
     private SystemAccountRoleRepository systemAccountRoleRepository;
     private SystemAccountRoleStatusRepository systemAccountRoleStatusRepository;
     private SystemOidcProviderService systemOidcProviderService;
-    private ObjectMapper objectMapper;
+    private LocalizationSettingService localizationSettingService;
     private SetupService service;
 
     @BeforeEach
     void setUp() {
-        systemConfigRepository = mock(SystemConfigRepository.class);
         systemAccountRepository = mock(SystemAccountRepository.class);
         systemAccountStatusRepository = mock(SystemAccountStatusRepository.class);
         systemAccountIdentityRepository = mock(SystemAccountIdentityRepository.class);
@@ -70,10 +64,9 @@ class SetupServiceTest {
         systemAccountRoleRepository = mock(SystemAccountRoleRepository.class);
         systemAccountRoleStatusRepository = mock(SystemAccountRoleStatusRepository.class);
         systemOidcProviderService = mock(SystemOidcProviderService.class);
-        objectMapper = new ObjectMapper();
+        localizationSettingService = mock(LocalizationSettingService.class);
 
         service = new SetupService(
-                systemConfigRepository,
                 systemAccountRepository,
                 systemAccountStatusRepository,
                 systemAccountIdentityRepository,
@@ -81,7 +74,7 @@ class SetupServiceTest {
                 systemAccountRoleRepository,
                 systemAccountRoleStatusRepository,
                 systemOidcProviderService,
-                objectMapper);
+                localizationSettingService);
     }
 
     /**
@@ -110,10 +103,14 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でsystem_configが2件（LANGUAGE/TIMEZONE）保存される")
-    void save_savesTwoSystemConfigs() {
+    @DisplayName("save()でlocalizationSettingService.saveBoth()が1回呼ばれる")
+    void save_callsLocalizationSaveBothOnce() {
         service.save(createSessionData());
-        verify(systemConfigRepository, times(2)).save(any(SystemConfig.class));
+        verify(localizationSettingService).saveBoth(
+                any(LanguageSetting.class),
+                any(TimezoneSetting.class),
+                any(OffsetDateTime.class),
+                eq("system:setup-wizard"));
     }
 
     @Test
@@ -132,33 +129,66 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()のLANGUAGE設定にDEFAULTとAVAILABLEが含まれる")
-    void save_languageConfigContainsDefaultAndAvailable() {
+    @DisplayName("save()でsaveBoth()に渡されるLanguageSettingがセッションの値と一致する")
+    void save_passesCorrectLanguageSetting() {
         service.save(createSessionData());
 
-        ArgumentCaptor<SystemConfig> captor = ArgumentCaptor.forClass(SystemConfig.class);
-        verify(systemConfigRepository, times(2)).save(captor.capture());
+        ArgumentCaptor<LanguageSetting> captor =
+                ArgumentCaptor.forClass(LanguageSetting.class);
+        verify(localizationSettingService).saveBoth(
+                captor.capture(),
+                any(TimezoneSetting.class),
+                any(OffsetDateTime.class),
+                any(String.class));
 
-        SystemConfig langConfig = captor.getAllValues().stream()
-                .filter(c -> "LANGUAGE".equals(c.getKey()))
-                .findFirst().orElseThrow();
-        assertThat(langConfig.getValue()).contains("\"DEFAULT\":\"ja\"");
-        assertThat(langConfig.getValue()).contains("\"AVAILABLE\":[\"ja\",\"en\"]");
+        LanguageSetting captured = captor.getValue();
+        assertThat(captured.getDefaultLanguage()).isEqualTo(SupportedLanguage.JA);
+        assertThat(captured.getAvailableLanguages())
+                .containsExactly(SupportedLanguage.JA, SupportedLanguage.EN);
     }
 
     @Test
-    @DisplayName("save()のTIMEZONE設定にDEFAULTとAVAILABLEが含まれる")
-    void save_timezoneConfigContainsDefaultAndAvailable() {
+    @DisplayName("save()でsaveBoth()に渡されるTimezoneSettingがセッションの値と一致する")
+    void save_passesCorrectTimezoneSetting() {
         service.save(createSessionData());
 
-        ArgumentCaptor<SystemConfig> captor = ArgumentCaptor.forClass(SystemConfig.class);
-        verify(systemConfigRepository, times(2)).save(captor.capture());
+        ArgumentCaptor<TimezoneSetting> captor =
+                ArgumentCaptor.forClass(TimezoneSetting.class);
+        verify(localizationSettingService).saveBoth(
+                any(LanguageSetting.class),
+                captor.capture(),
+                any(OffsetDateTime.class),
+                any(String.class));
 
-        SystemConfig tzConfig = captor.getAllValues().stream()
-                .filter(c -> "TIMEZONE".equals(c.getKey()))
-                .findFirst().orElseThrow();
-        assertThat(tzConfig.getValue()).contains("\"DEFAULT\":\"Asia/Tokyo\"");
-        assertThat(tzConfig.getValue()).contains("\"AVAILABLE\":[\"Asia/Tokyo\"]");
+        TimezoneSetting captured = captor.getValue();
+        assertThat(captured.getDefaultTimezone().getId()).isEqualTo("Asia/Tokyo");
+        assertThat(captured.getAvailableTimezones())
+                .extracting(SupportedTimezone::getId)
+                .containsExactly("Asia/Tokyo");
+    }
+
+    @Test
+    @DisplayName("save()でOIDCプロバイダーとLocalizationが同じversionで保存される")
+    void save_passesSameVersionToOidcAndLocalization() {
+        service.save(createSessionData());
+
+        ArgumentCaptor<OffsetDateTime> oidcVersionCaptor =
+                ArgumentCaptor.forClass(OffsetDateTime.class);
+        ArgumentCaptor<OffsetDateTime> localizationVersionCaptor =
+                ArgumentCaptor.forClass(OffsetDateTime.class);
+
+        verify(systemOidcProviderService).register(
+                any(), any(), any(), any(), any(), any(),
+                oidcVersionCaptor.capture(),
+                any());
+        verify(localizationSettingService).saveBoth(
+                any(LanguageSetting.class),
+                any(TimezoneSetting.class),
+                localizationVersionCaptor.capture(),
+                any(String.class));
+
+        assertThat(localizationVersionCaptor.getValue())
+                .isEqualTo(oidcVersionCaptor.getValue());
     }
 
     @Test
@@ -223,7 +253,7 @@ class SetupServiceTest {
     }
 
     @Test
-    @DisplayName("save()でsystem_account_rolesがSYSTEM_ADMINで保存される（role_idベース）")
+    @DisplayName("save()でsystem_account_rolesがSYSTEM_ADMINで保存される(role_idベース)")
     void save_savesSystemAccountRoleAsSystemAdmin() {
         service.save(createSessionData());
 
@@ -309,31 +339,6 @@ class SetupServiceTest {
 
         assertThat(statusCaptor.getValue().getRoleId())
                 .isEqualTo(roleCaptor.getValue().getRoleId());
-    }
-
-    @Test
-    @DisplayName("save()でLANGUAGE/TIMEZONEのJSON変換に失敗するとRuntimeException")
-    void save_jsonProcessingException_throwsRuntimeException() throws Exception {
-        ObjectMapper mockMapper = mock(ObjectMapper.class);
-        when(mockMapper.writeValueAsString(any()))
-                .thenThrow(new JsonProcessingException("error") {
-                    private static final long serialVersionUID = 1L;
-                });
-
-        SetupService failingService = new SetupService(
-                systemConfigRepository,
-                systemAccountRepository,
-                systemAccountStatusRepository,
-                systemAccountIdentityRepository,
-                systemAccountIdentityStatusRepository,
-                systemAccountRoleRepository,
-                systemAccountRoleStatusRepository,
-                systemOidcProviderService,
-                mockMapper);
-
-        assertThatThrownBy(() -> failingService.save(createSessionData()))
-                .isInstanceOf(RuntimeException.class)
-                .hasMessageContaining("設定のJSON変換に失敗しました");
     }
 
 }

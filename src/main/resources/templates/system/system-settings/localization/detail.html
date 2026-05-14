@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.localization.detail.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='system-settings')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/system-settings}"
+                               th:text="#{system.systemSettings.title}">システム管理</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.localization.detail.breadcrumb}">
+                            言語・タイムゾーン
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル + アクションボタン -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-translate me-2"></i>
+                        <span th:text="#{system.localization.detail.title}">言語・タイムゾーン設定</span>
+                    </h1>
+                    <a class="btn btn-primary"
+                       th:href="@{/system/system-settings/localization/edit}">
+                        <i class="bi bi-pencil me-1"></i>
+                        <span th:text="#{system.localization.detail.button.edit}">編集</span>
+                    </a>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ -->
+                <div th:if="${flashErrorKey}" class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="#{__${flashErrorKey}__}">エラーが発生しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- 言語設定                                                      -->
+                <!-- ============================================================ -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-chat-left-text me-2"></i>
+                            <span th:text="#{system.localization.detail.section.language}">言語設定</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- 未設定の場合 -->
+                        <div th:unless="${localization.languageConfigured}"
+                             class="text-center py-3">
+                            <i class="bi bi-exclamation-circle text-warning"
+                               style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-1 fw-semibold"
+                               th:text="#{system.localization.detail.notConfigured}">未設定</p>
+                            <p class="text-muted small mb-0"
+                               th:text="#{system.localization.detail.notConfigured.description}">
+                                この項目はまだ設定されていません。「編集」から設定してください。
+                            </p>
+                        </div>
+
+                        <!-- 設定済みの場合 -->
+                        <dl th:if="${localization.languageConfigured}" class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.defaultLanguage}">デフォルト言語</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-primary"
+                                      th:text="${localization.defaultLanguage.displayName}">
+                                    日本語
+                                </span>
+                                <code class="text-muted ms-2 small"
+                                      th:text="${localization.defaultLanguage.code}">ja</code>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.availableLanguages}">利用可能言語</dt>
+                            <dd class="col-sm-9">
+                                <span th:each="lang : ${localization.availableLanguages}"
+                                      class="badge bg-light text-dark border me-1">
+                                    <span th:text="${lang.displayName}">日本語</span>
+                                    <code class="text-muted ms-1 small"
+                                          th:text="${lang.code}">ja</code>
+                                </span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- タイムゾーン設定                                               -->
+                <!-- ============================================================ -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock me-2"></i>
+                            <span th:text="#{system.localization.detail.section.timezone}">タイムゾーン設定</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- 未設定の場合 -->
+                        <div th:unless="${localization.timezoneConfigured}"
+                             class="text-center py-3">
+                            <i class="bi bi-exclamation-circle text-warning"
+                               style="font-size: 2rem;"></i>
+                            <p class="mt-2 mb-1 fw-semibold"
+                               th:text="#{system.localization.detail.notConfigured}">未設定</p>
+                            <p class="text-muted small mb-0"
+                               th:text="#{system.localization.detail.notConfigured.description}">
+                                この項目はまだ設定されていません。「編集」から設定してください。
+                            </p>
+                        </div>
+
+                        <!-- 設定済みの場合 -->
+                        <dl th:if="${localization.timezoneConfigured}" class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.defaultTimezone}">デフォルトタイムゾーン</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-primary"
+                                      th:text="${localization.defaultTimezone.displayName}">
+                                    Asia/Tokyo (UTC+09:00)
+                                </span>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.availableTimezones}">利用可能タイムゾーン</dt>
+                            <dd class="col-sm-9">
+                                <div class="d-flex flex-wrap gap-1">
+                                    <span th:each="tz : ${localization.availableTimezones}"
+                                          class="badge bg-light text-dark border"
+                                          th:text="${tz.displayName}">
+                                        Asia/Tokyo (UTC+09:00)
+                                    </span>
+                                </div>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- 監査情報                                                      -->
+                <!-- ============================================================ -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span th:text="#{system.localization.detail.section.languageAudit}">言語設定 監査情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl th:if="${localization.languageVersion != null}" class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.languageVersion}">言語設定 更新日時</dt>
+                            <dd class="col-sm-9"
+                                th:text="${#temporals.format(localization.languageVersion, 'yyyy-MM-dd HH:mm:ss z')}">
+                                2026-05-04 02:30:15 UTC
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.languageCreatedBy}">言語設定 更新者</dt>
+                            <dd class="col-sm-9"
+                                th:text="${localization.languageCreatedBy}">system:setup-wizard</dd>
+                        </dl>
+                        <p th:if="${localization.languageVersion == null}"
+                           class="text-muted mb-0 small"
+                           th:text="#{system.localization.detail.notConfigured}">未設定</p>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span th:text="#{system.localization.detail.section.timezoneAudit}">タイムゾーン設定 監査情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl th:if="${localization.timezoneVersion != null}" class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.timezoneVersion}">タイムゾーン設定 更新日時</dt>
+                            <dd class="col-sm-9"
+                                th:text="${#temporals.format(localization.timezoneVersion, 'yyyy-MM-dd HH:mm:ss z')}">
+                                2026-05-04 02:30:15 UTC
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.localization.field.timezoneCreatedBy}">タイムゾーン設定 更新者</dt>
+                            <dd class="col-sm-9"
+                                th:text="${localization.timezoneCreatedBy}">system:setup-wizard</dd>
+                        </dl>
+                        <p th:if="${localization.timezoneVersion == null}"
+                           class="text-muted mb-0 small"
+                           th:text="#{system.localization.detail.notConfigured}">未設定</p>
+                    </div>
+                </div>
+
+                <!-- 戻るリンク -->
+                <div class="mb-4">
+                    <a th:href="@{/system/system-settings}"
+                       class="btn btn-link text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.localization.detail.button.back}">システム管理に戻る</span>
+                    </a>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

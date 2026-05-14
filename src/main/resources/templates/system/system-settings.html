@@ -51,27 +51,26 @@
                         </a>
                     </div>
 
-                    <!-- 言語・タイムゾーン（Coming Soon） -->
+                    <!-- 言語・タイムゾーン（J.0で実装済） -->
                     <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 settings-card-disabled">
+                        <a th:href="@{/system/system-settings/localization}"
+                           class="card h-100 text-decoration-none text-body settings-card">
                             <div class="card-body">
                                 <div class="d-flex align-items-center mb-3">
-                                    <div class="settings-icon-wrapper bg-secondary bg-opacity-10 text-secondary me-3">
+                                    <div class="settings-icon-wrapper bg-info bg-opacity-10 text-info me-3">
                                         <i class="bi bi-translate"></i>
                                     </div>
-                                    <h5 class="card-title mb-0 text-muted"
+                                    <h5 class="card-title mb-0"
                                         th:text="#{system.systemSettings.cards.localization.title}">
                                         言語・タイムゾーン
                                     </h5>
                                 </div>
-                                <p class="card-text text-muted small mb-2"
+                                <p class="card-text text-muted small mb-0"
                                    th:text="#{system.systemSettings.cards.localization.description}">
                                     システム全体の既定言語とタイムゾーンを管理します。
                                 </p>
-                                <span class="badge bg-secondary"
-                                      th:text="#{system.common.comingSoon.title}">Coming Soon</span>
                             </div>
-                        </div>
+                        </a>
                     </div>
 
                 </div>
