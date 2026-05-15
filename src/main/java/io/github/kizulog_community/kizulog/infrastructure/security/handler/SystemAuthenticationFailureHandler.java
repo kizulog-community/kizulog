@@ -11,6 +11,7 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -22,6 +23,8 @@ import jakarta.servlet.http.HttpServletResponse;
  * <p>遷移先：
  * <ul>
  * <li>InvitationError系（IDENTITY_EXISTS, INVITATION_NOT_FOUND等）→ /system/invite/error?code={errorCode}</li>
+ * <li>IdentityLinkError系（PROVIDER_NOT_FOUND, PROVIDER_ALREADY_LINKED 等）
+ *     → /system/my-profile/oidc-links/error?code={errorCode}</li>
  * <li>それ以外 → /system/login?error={errorCode}</li>
  * <li>errorCode取得不能 → /system/login?error</li>
  * </ul>
@@ -45,6 +48,10 @@ public class SystemAuthenticationFailureHandler implements AuthenticationFailure
     /** 招待エラー時のリダイレクト先テンプレート */
     private static final String INVITE_FAILURE_URL_WITH_CODE = "/system/invite/error?code=";
 
+    /** identityリンクエラー時のリダイレクト先テンプレート */
+    private static final String OIDC_LINK_FAILURE_URL_WITH_CODE =
+            "/system/my-profile/oidc-links/error?code=";
+
     /**
      * 認証失敗時の処理。
      *
@@ -67,6 +74,8 @@ public class SystemAuthenticationFailureHandler implements AuthenticationFailure
                 String encoded = URLEncoder.encode(errorCode, StandardCharsets.UTF_8);
                 if (isInvitationError(errorCode)) {
                     redirectUrl = INVITE_FAILURE_URL_WITH_CODE + encoded;
+                } else if (isIdentityLinkError(errorCode)) {
+                    redirectUrl = OIDC_LINK_FAILURE_URL_WITH_CODE + encoded;
                 } else {
                     redirectUrl = LOGIN_FAILURE_URL_WITH_CODE + encoded;
                 }
@@ -84,6 +93,21 @@ public class SystemAuthenticationFailureHandler implements AuthenticationFailure
      */
     private boolean isInvitationError(String errorCode) {
         for (InvitationError e : InvitationError.values()) {
+            if (e.name().equals(errorCode)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * エラーコードが IdentityLinkError 由来か判定する。
+     *
+     * @param errorCode エラーコード
+     * @return IdentityLinkError由来ならtrue
+     */
+    private boolean isIdentityLinkError(String errorCode) {
+        for (IdentityLinkError e : IdentityLinkError.values()) {
             if (e.name().equals(errorCode)) {
                 return true;
             }

@@ -27,8 +27,11 @@ import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkError;
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkException;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountIdentityLinkService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationException;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.InvitationAcceptanceService;
@@ -38,6 +41,7 @@ import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAut
 import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemAuthenticationService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.invite.InvitationAcceptanceSession;
+import io.github.kizulog_community.kizulog.infrastructure.web.system.myprofile.IdentityLinkSession;
 
 /**
  * SystemOidcUserServiceの単体テスト
@@ -52,6 +56,7 @@ class SystemOidcUserServiceTest {
     private static final String ACCOUNT_ID = "acc-1";
     private static final String IDENTITY_ID = "identity-1";
     private static final String INVITATION_ID = "invite-1";
+    private static final String PROVIDER_ID = "master";
     private static final OffsetDateTime VERSION =
             OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
@@ -59,7 +64,9 @@ class SystemOidcUserServiceTest {
     private SystemAccountIdentityRepository identityRepository;
     private InvitationAcceptanceService invitationAcceptanceService;
     private SystemAdminInvitationService invitationService;
+    private SystemAccountIdentityLinkService identityLinkService;
     private InvitationAcceptanceSession invitationSession;
+    private IdentityLinkSession identityLinkSession;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private SystemOidcUserService sut;
 
@@ -69,21 +76,26 @@ class SystemOidcUserServiceTest {
         identityRepository = mock(SystemAccountIdentityRepository.class);
         invitationAcceptanceService = mock(InvitationAcceptanceService.class);
         invitationService = mock(SystemAdminInvitationService.class);
+        identityLinkService = mock(SystemAccountIdentityLinkService.class);
         invitationSession = mock(InvitationAcceptanceSession.class);
+        identityLinkSession = mock(IdentityLinkSession.class);
         @SuppressWarnings("unchecked")
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
                 mock(OAuth2UserService.class);
         delegate = mockDelegate;
 
-        // 既定: 招待ペンディングなし(通常ログインフロー)
+        // 既定: pending無し（通常ログインフロー）
         when(invitationSession.isPending()).thenReturn(false);
+        when(identityLinkSession.isPending()).thenReturn(false);
 
         sut = new SystemOidcUserService(
                 authService,
                 identityRepository,
                 invitationAcceptanceService,
                 invitationService,
+                identityLinkService,
                 invitationSession,
+                identityLinkSession,
                 delegate);
     }
 
@@ -140,6 +152,12 @@ class SystemOidcUserServiceTest {
         return new SystemAccountIdentity(
                 "new-identity-id", VERSION, "new-account-id", ISS, AUD, SUB,
                 VERSION, "system:invite:" + INVITATION_ID);
+    }
+
+    private SystemAccountIdentity newlyLinkedIdentity() {
+        return new SystemAccountIdentity(
+                "linked-identity-id", VERSION, ACCOUNT_ID, ISS, AUD, SUB,
+                VERSION, "system:identity-link:" + ACCOUNT_ID);
     }
 
     @Test
@@ -284,6 +302,20 @@ class SystemOidcUserServiceTest {
     }
 
     @Test
+    @DisplayName("loadUser: 通常ログインフロー - identityLinkServiceは呼ばれない")
+    void loadUser_doesNotCallIdentityLinkService_whenStandardLogin() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(authService.authenticate(ISS, AUD, SUB)).thenReturn(identity());
+
+        sut.loadUser(userRequest);
+
+        verify(identityLinkService, never()).linkIdentity(
+                anyString(), anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
     @DisplayName("loadUser: 招待受諾フロー - identity未存在の新規受諾者、acceptInvitationが呼ばれsession.clear()される")
     void loadUser_invitationFlow_createsNewAccount_whenIdentityNotExists() {
         OidcUser oidcUser = buildOidcUser();
@@ -425,6 +457,116 @@ class SystemOidcUserServiceTest {
         sut.loadUser(userRequest);
 
         verify(authService, never()).authenticate(anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("loadUser: identityリンクフロー - 成功時、新規identityでPrincipalを返却・session.clear()される")
+    void loadUser_identityLinkFlow_succeeds() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(identityLinkSession.isPending()).thenReturn(true);
+        when(identityLinkSession.getTargetAccountId()).thenReturn(ACCOUNT_ID);
+        when(identityLinkSession.getProviderId()).thenReturn(PROVIDER_ID);
+        when(identityLinkService.linkIdentity(ACCOUNT_ID, PROVIDER_ID, ISS, AUD, SUB))
+                .thenReturn(newlyLinkedIdentity());
+
+        OidcUser result = sut.loadUser(userRequest);
+
+        assertThat(result).isInstanceOf(SystemUserPrincipal.class);
+        SystemUserPrincipal principal = (SystemUserPrincipal) result;
+        assertThat(principal.getAccountId()).isEqualTo(ACCOUNT_ID);
+        assertThat(principal.getIdentityId()).isEqualTo("linked-identity-id");
+
+        verify(identityLinkService).linkIdentity(ACCOUNT_ID, PROVIDER_ID, ISS, AUD, SUB);
+        verify(identityLinkSession).clear();
+        // 通常認証・招待は呼ばれない
+        verify(authService, never()).authenticate(anyString(), anyString(), anyString());
+        verify(invitationAcceptanceService, never())
+                .acceptInvitation(anyString(), anyString(), anyString(), anyString());
+    }
+
+    @Test
+    @DisplayName("loadUser: identityリンクフロー - IdentityLinkException→errorCode付きOAuth2例外＋session.clear()")
+    void loadUser_identityLinkFlow_convertsDomainException() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(identityLinkSession.isPending()).thenReturn(true);
+        when(identityLinkSession.getTargetAccountId()).thenReturn(ACCOUNT_ID);
+        when(identityLinkSession.getProviderId()).thenReturn(PROVIDER_ID);
+        when(identityLinkService.linkIdentity(ACCOUNT_ID, PROVIDER_ID, ISS, AUD, SUB))
+                .thenThrow(new IdentityLinkException(
+                        IdentityLinkError.IDENTITY_ALREADY_LINKED));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(IdentityLinkError.IDENTITY_ALREADY_LINKED.name());
+
+        verify(identityLinkSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: identityリンクフロー - PROVIDER_ALREADY_LINKED→errorCode付きOAuth2例外")
+    void loadUser_identityLinkFlow_providerAlreadyLinked() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(identityLinkSession.isPending()).thenReturn(true);
+        when(identityLinkSession.getTargetAccountId()).thenReturn(ACCOUNT_ID);
+        when(identityLinkSession.getProviderId()).thenReturn(PROVIDER_ID);
+        when(identityLinkService.linkIdentity(ACCOUNT_ID, PROVIDER_ID, ISS, AUD, SUB))
+                .thenThrow(new IdentityLinkException(
+                        IdentityLinkError.PROVIDER_ALREADY_LINKED));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(IdentityLinkError.PROVIDER_ALREADY_LINKED.name());
+
+        verify(identityLinkSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: identityリンクフロー - 予期せぬRuntimeException→PROVIDER_NOT_FOUND相当に変換")
+    void loadUser_identityLinkFlow_unexpectedExceptionMapsToProviderNotFound() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(identityLinkSession.isPending()).thenReturn(true);
+        when(identityLinkSession.getTargetAccountId()).thenReturn(ACCOUNT_ID);
+        when(identityLinkSession.getProviderId()).thenReturn(PROVIDER_ID);
+        when(identityLinkService.linkIdentity(ACCOUNT_ID, PROVIDER_ID, ISS, AUD, SUB))
+                .thenThrow(new RuntimeException("DB connection refused"));
+
+        assertThatThrownBy(() -> sut.loadUser(userRequest))
+                .isInstanceOf(OAuth2AuthenticationException.class)
+                .extracting("error.errorCode")
+                .isEqualTo(IdentityLinkError.PROVIDER_NOT_FOUND.name());
+
+        verify(identityLinkSession).clear();
+    }
+
+    @Test
+    @DisplayName("loadUser: 招待pendingとidentityリンクpendingが両方ONなら、招待を優先（フェイルセーフ）")
+    void loadUser_invitationTakesPriorityOverIdentityLink() {
+        OidcUser oidcUser = buildOidcUser();
+        OidcUserRequest userRequest = buildUserRequest();
+        when(delegate.loadUser(any())).thenReturn(oidcUser);
+        when(invitationSession.isPending()).thenReturn(true);
+        when(invitationSession.getInvitationId()).thenReturn(INVITATION_ID);
+        when(identityLinkSession.isPending()).thenReturn(true);
+        when(identityRepository.findLatestByIssAndAudAndSub(ISS, AUD, SUB))
+                .thenReturn(Optional.empty());
+        when(invitationAcceptanceService.acceptInvitation(INVITATION_ID, ISS, AUD, SUB))
+                .thenReturn(newlyCreatedIdentity());
+
+        sut.loadUser(userRequest);
+
+        verify(invitationAcceptanceService).acceptInvitation(INVITATION_ID, ISS, AUD, SUB);
+        verify(identityLinkService, never()).linkIdentity(
+                anyString(), anyString(), anyString(), anyString(), anyString());
     }
 
 }

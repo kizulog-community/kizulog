@@ -11,8 +11,11 @@ import org.springframework.security.oauth2.core.OAuth2Error;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import org.springframework.stereotype.Component;
 
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkError;
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkException;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountIdentityLinkService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.InvitationAcceptanceService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.SystemAdminInvitationService;
@@ -20,6 +23,7 @@ import io.github.kizulog_community.kizulog.domain.systemauth.exception.SystemAut
 import io.github.kizulog_community.kizulog.domain.systemauth.service.SystemAuthenticationService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.invite.InvitationAcceptanceSession;
+import io.github.kizulog_community.kizulog.infrastructure.web.system.myprofile.IdentityLinkSession;
 
 /**
  * システム管理者OIDCユーザーサービス
@@ -32,21 +36,22 @@ import io.github.kizulog_community.kizulog.infrastructure.web.system.invite.Invi
  * <ol>
  * <li>Spring標準の OidcUserService にデリゲートしてID Token検証・UserInfo取得</li>
  * <li>ID Tokenから iss/sub + ClientRegistrationから aud を抽出</li>
- * <li>セッションに招待待ち状態があるか判定:
+ * <li>セッションの状態に応じて3分岐:
  * <ul>
- * <li>あり → 招待受諾フロー(新規account+identity+role作成)</li>
- * <li>なし → 通常ログインフロー(既存identityで認証)</li>
+ * <li>招待pending → 招待受諾フロー（新規account+identity+role作成）</li>
+ * <li>identityリンクpending → 既存accountへのidentity追加フロー</li>
+ * <li>それ以外 → 通常ログインフロー（既存identityで認証）</li>
  * </ul>
  * </li>
  * <li>SystemUserPrincipalを生成してSpring Securityに返却</li>
  * </ol>
  * 認証失敗時は OAuth2AuthenticationException に変換して投げる。</p>
  *
- * <p>招待受諾フロー詳細:
- * セッション内のInvitationAcceptanceSessionがpending状態の場合、
- * 1.iss/aud/subで既存identityがあれば「既に登録済」エラー、
- * 2.なければInvitationAcceptanceServiceで新規アカウント+identity+SYSTEM_ADMINロール作成。
- * いずれの場合もセッション状態はクリアする。</p>
+ * <p>identityリンクフロー詳細:
+ * セッションのIdentityLinkSessionがpending状態の場合、
+ * 1. SystemAccountIdentityLinkServiceで重複チェックを伴って新規identityを作成し、
+ * 2. 作成済みidentityで SystemUserPrincipal を生成して返す。
+ * セッション状態は必ずクリアする。</p>
  *
  * <p>audの取得についての注釈:
  * Spring SecurityのOidcIdTokenValidatorはID Tokenのaudクレームに
@@ -73,8 +78,14 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
     /** 招待管理サービス(自動CANCELLED時に使用) */
     private final SystemAdminInvitationService invitationService;
 
+    /** identityリンクサービス */
+    private final SystemAccountIdentityLinkService identityLinkService;
+
     /** 招待セッション(sessionスコープProxy Bean) */
     private final InvitationAcceptanceSession invitationSession;
+
+    /** identityリンクセッション(sessionスコープProxy Bean) */
+    private final IdentityLinkSession identityLinkSession;
 
     /** Spring標準のOidcUserService（デリゲート） */
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
@@ -86,7 +97,9 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
      * @param systemAccountIdentityRepository identityリポジトリ
      * @param invitationAcceptanceService 招待受諾オーケストレーションサービス
      * @param invitationService 招待管理サービス
-     * @param invitationSession 招待セッション(sessionスコープProxy Bean)
+     * @param identityLinkService identityリンクサービス
+     * @param invitationSession 招待セッション
+     * @param identityLinkSession identityリンクセッション
      */
     @Autowired
     public SystemOidcUserService(
@@ -94,13 +107,17 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAccountIdentityRepository systemAccountIdentityRepository,
             InvitationAcceptanceService invitationAcceptanceService,
             SystemAdminInvitationService invitationService,
-            InvitationAcceptanceSession invitationSession) {
+            SystemAccountIdentityLinkService identityLinkService,
+            InvitationAcceptanceSession invitationSession,
+            IdentityLinkSession identityLinkSession) {
         this(
                 systemAuthenticationService,
                 systemAccountIdentityRepository,
                 invitationAcceptanceService,
                 invitationService,
+                identityLinkService,
                 invitationSession,
+                identityLinkSession,
                 new OidcUserService());
     }
 
@@ -114,13 +131,17 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAccountIdentityRepository systemAccountIdentityRepository,
             InvitationAcceptanceService invitationAcceptanceService,
             SystemAdminInvitationService invitationService,
+            SystemAccountIdentityLinkService identityLinkService,
             InvitationAcceptanceSession invitationSession,
+            IdentityLinkSession identityLinkSession,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.systemAuthenticationService = systemAuthenticationService;
         this.systemAccountIdentityRepository = systemAccountIdentityRepository;
         this.invitationAcceptanceService = invitationAcceptanceService;
         this.invitationService = invitationService;
+        this.identityLinkService = identityLinkService;
         this.invitationSession = invitationSession;
+        this.identityLinkSession = identityLinkSession;
         this.delegate = delegate;
     }
 
@@ -142,10 +163,12 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
         String aud = userRequest.getClientRegistration().getClientId();
         String sub = oidcUser.getIdToken().getSubject();
 
-        // 3) 招待ペンディングか通常ログインかを分岐
+        // 3) セッション状態による3分岐
         SystemAccountIdentity identity;
         if (invitationSession.isPending()) {
             identity = handleInvitationFlow(iss, aud, sub);
+        } else if (identityLinkSession.isPending()) {
+            identity = handleIdentityLinkFlow(iss, aud, sub);
         } else {
             identity = handleStandardLoginFlow(iss, aud, sub);
         }
@@ -222,6 +245,51 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
 
         invitationSession.clear();
         return created;
+    }
+
+    /**
+     * identityリンクフローの処理。
+     *
+     * <p>SystemAccountIdentityLinkService.linkIdentity()で
+     * 重複チェック+identity+identity_status作成を1トランザクションで行う。
+     * 結果のidentityはACTIVE状態で、そのままセッションのprincipalとして利用可能。</p>
+     *
+     * <p>ドメイン例外（IdentityLinkException）は OAuth2AuthenticationException に変換し、
+     * SystemAuthenticationFailureHandler が
+     * {@code /system/my-profile/oidc-links/error?code=...} へリダイレクトする。</p>
+     *
+     * @return 作成されたidentity
+     * @throws OAuth2AuthenticationException リンク不能な場合
+     */
+    private SystemAccountIdentity handleIdentityLinkFlow(String iss, String aud, String sub) {
+        String accountId = identityLinkSession.getTargetAccountId();
+        String providerId = identityLinkSession.getProviderId();
+        log.info("identityリンクフロー開始: accountId={}, providerId={}, iss={}, aud={}, sub={}",
+                accountId, providerId, iss, aud, sub);
+
+        try {
+            SystemAccountIdentity created = identityLinkService.linkIdentity(
+                    accountId, providerId, iss, aud, sub);
+            identityLinkSession.clear();
+            log.info("identityリンク完了: accountId={}, identityId={}",
+                    created.getAccountId(), created.getIdentityId());
+            return created;
+        } catch (IdentityLinkException e) {
+            log.warn("identityリンク失敗: accountId={}, providerId={}, error={}",
+                    accountId, providerId, e.getError());
+            identityLinkSession.clear();
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error(e.getError().name()),
+                    "Identity link failed: " + e.getError().name(),
+                    e);
+        } catch (RuntimeException e) {
+            log.warn("identityリンクの処理中に予期せぬエラー: accountId={}, error={}",
+                    accountId, e.getMessage());
+            identityLinkSession.clear();
+            throw new OAuth2AuthenticationException(
+                    new OAuth2Error(IdentityLinkError.PROVIDER_NOT_FOUND.name()),
+                    "Identity link unexpected error", e);
+        }
     }
 
     /**

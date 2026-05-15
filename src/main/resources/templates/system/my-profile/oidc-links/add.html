@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.oidc-links.add.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile}"
+                               th:text="#{system.my-profile.title}">プロフィール設定</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile/oidc-links}"
+                               th:text="#{system.my-profile.oidc-links.list.breadcrumb}">
+                                連携OIDCプロバイダー
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.my-profile.oidc-links.add.breadcrumb}">
+                            連携を追加
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="mb-4">
+                    <h1 class="h3 mb-2">
+                        <i class="bi bi-plus-circle me-2"></i>
+                        <span th:text="#{system.my-profile.oidc-links.add.title}">
+                            連携を追加
+                        </span>
+                    </h1>
+                    <p class="text-muted mb-0"
+                       th:text="#{system.my-profile.oidc-links.add.description}">
+                        追加するOIDCプロバイダーを選択してください。
+                        選択後、対象プロバイダーへログインすると、現在のアカウントに紐付けられます。
+                    </p>
+                </div>
+
+                <!-- 注意書き -->
+                <div class="alert alert-info" role="alert">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <span th:text="#{system.my-profile.oidc-links.add.note}">
+                        既に他のアカウントで使われているOIDCの認証情報は連携できません。
+                    </span>
+                </div>
+
+                <!-- 0件の場合 -->
+                <div th:if="${#lists.isEmpty(providers)}" class="card">
+                    <div class="card-body text-center py-5">
+                        <i class="bi bi-inbox text-secondary" style="font-size: 3rem;"></i>
+                        <p class="mt-3 text-muted mb-3"
+                           th:text="#{system.my-profile.oidc-links.add.empty}">
+                            追加可能なプロバイダーはありません。
+                        </p>
+                        <p class="text-muted small mb-0"
+                           th:text="#{system.my-profile.oidc-links.add.emptyHint}">
+                            既に全ての有効なプロバイダーで連携済みです。
+                        </p>
+                    </div>
+                </div>
+
+                <!-- 1件以上: プロバイダー選択カードリスト -->
+                <div th:if="${not #lists.isEmpty(providers)}" class="row g-3">
+                    <div th:each="pws : ${providers}" class="col-md-6 col-lg-4">
+                        <form th:action="@{/system/my-profile/oidc-links/start}"
+                              method="post"
+                              class="h-100">
+                            <input type="hidden" name="providerId"
+                                   th:value="${pws.provider.providerId}" />
+                            <button type="submit"
+                                    class="card h-100 w-100 text-decoration-none text-body myprofile-card border"
+                                    style="cursor: pointer;">
+                                <div class="card-body text-start">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <div class="myprofile-icon-wrapper bg-primary bg-opacity-10 text-primary me-3">
+                                            <i class="bi bi-shield-lock"></i>
+                                        </div>
+                                        <h5 class="card-title mb-0"
+                                            th:text="${pws.provider.displayName}">
+                                            Keycloak Master
+                                        </h5>
+                                    </div>
+                                    <p class="card-text small mb-1">
+                                        <code class="text-muted" th:text="${pws.provider.uri}">
+                                            https://auth.example/realms/master
+                                        </code>
+                                    </p>
+                                    <p class="card-text text-muted small mb-0">
+                                        <code th:text="${pws.provider.providerId}">master</code>
+                                    </p>
+                                </div>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 戻るボタン -->
+                <div class="mt-4">
+                    <a class="btn btn-outline-secondary"
+                       th:href="@{/system/my-profile/oidc-links}">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.my-profile.oidc-links.add.button.back}">
+                            連携一覧に戻る
+                        </span>
+                    </a>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <style>
+        .myprofile-card {
+            transition: all 0.2s ease;
+            background: white;
+        }
+        .myprofile-card:hover {
+            border-color: #0d6efd !important;
+            box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+        .myprofile-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+    </style>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.oidc-links.error.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile}"
+                               th:text="#{system.my-profile.title}">プロフィール設定</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile/oidc-links}"
+                               th:text="#{system.my-profile.oidc-links.list.breadcrumb}">
+                                連携OIDCプロバイダー
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.my-profile.oidc-links.error.breadcrumb}">
+                            エラー
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- エラーカード -->
+                <div class="card border-danger" style="max-width: 720px;">
+                    <div class="card-body p-4">
+
+                        <div class="text-center mb-4">
+                            <i class="bi bi-exclamation-octagon-fill text-danger"
+                               style="font-size: 3rem;"></i>
+                            <h2 class="h4 mt-3 mb-0"
+                                th:text="#{system.my-profile.oidc-links.error.heading}">
+                                連携に失敗しました
+                            </h2>
+                        </div>
+
+                        <!-- エラーコード別メッセージ -->
+                        <p class="mb-3">
+                            <span th:if="${errorCode == 'PROVIDER_NOT_FOUND'}"
+                                  th:text="#{system.my-profile.oidc-links.error.PROVIDER_NOT_FOUND}">
+                                指定されたOIDCプロバイダーは利用できません。
+                            </span>
+                            <span th:if="${errorCode == 'PROVIDER_ALREADY_LINKED'}"
+                                  th:text="#{system.my-profile.oidc-links.error.PROVIDER_ALREADY_LINKED}">
+                                このプロバイダーは既にあなたのアカウントに連携されています。
+                            </span>
+                            <span th:if="${errorCode == 'IDENTITY_ALREADY_LINKED'}"
+                                  th:text="#{system.my-profile.oidc-links.error.IDENTITY_ALREADY_LINKED}">
+                                このOIDC認証情報は既に他のアカウントで使用されています。
+                            </span>
+                            <span th:if="${errorCode == 'IDENTITY_NOT_FOUND'}"
+                                  th:text="#{system.my-profile.oidc-links.error.IDENTITY_NOT_FOUND}">
+                                対象の連携が見つかりませんでした。
+                            </span>
+                            <span th:if="${errorCode == 'IDENTITY_NOT_OWNED'}"
+                                  th:text="#{system.my-profile.oidc-links.error.IDENTITY_NOT_OWNED}">
+                                操作する権限がありません。
+                            </span>
+                            <span th:if="${errorCode == 'CANNOT_UNLINK_CURRENT_SESSION'}"
+                                  th:text="#{system.my-profile.oidc-links.error.CANNOT_UNLINK_CURRENT_SESSION}">
+                                現在ログイン中の連携は解除できません。
+                            </span>
+                            <span th:if="${errorCode == 'CANNOT_UNLINK_LAST_ACTIVE'}"
+                                  th:text="#{system.my-profile.oidc-links.error.CANNOT_UNLINK_LAST_ACTIVE}">
+                                最後の有効な連携は解除できません。
+                            </span>
+                            <span th:if="${errorCode == 'ALREADY_INACTIVE'}"
+                                  th:text="#{system.my-profile.oidc-links.error.ALREADY_INACTIVE}">
+                                この連携は既に解除済みです。
+                            </span>
+                            <span th:if="${errorCode == 'UNKNOWN'}"
+                                  th:text="#{system.my-profile.oidc-links.error.UNKNOWN}">
+                                連携処理中にエラーが発生しました。
+                            </span>
+                        </p>
+
+                        <!-- エラーコードの表示（デバッグ補助） -->
+                        <div class="text-muted small mb-3">
+                            <i class="bi bi-info-circle me-1"></i>
+                            <span th:text="#{system.my-profile.oidc-links.error.code}">
+                                エラーコード:
+                            </span>
+                            <code th:text="${errorCode}">UNKNOWN</code>
+                        </div>
+
+                        <!-- アクション -->
+                        <div class="d-flex gap-2">
+                            <a class="btn btn-primary"
+                               th:href="@{/system/my-profile/oidc-links}">
+                                <i class="bi bi-arrow-left me-1"></i>
+                                <span th:text="#{system.my-profile.oidc-links.error.button.back}">
+                                    一覧に戻る
+                                </span>
+                            </a>
+                        </div>
+
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

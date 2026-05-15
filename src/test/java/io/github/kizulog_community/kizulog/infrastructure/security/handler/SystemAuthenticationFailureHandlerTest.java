@@ -12,6 +12,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
+import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 
 /**
@@ -178,6 +179,36 @@ class SystemAuthenticationFailureHandlerTest {
         // " " → "+" (URLEncoder.encode のデフォルト挙動)
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("/system/login?error=error+with+spaces");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: PROVIDER_ALREADY_LINKED は /system/my-profile/oidc-links/error へ")
+    void onFailure_providerAlreadyLinked_redirectsToOidcLinkError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(IdentityLinkError.PROVIDER_ALREADY_LINKED.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/system/my-profile/oidc-links/error?code=PROVIDER_ALREADY_LINKED");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: IDENTITY_ALREADY_LINKED は /system/my-profile/oidc-links/error へ")
+    void onFailure_identityAlreadyLinked_redirectsToOidcLinkError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(IdentityLinkError.IDENTITY_ALREADY_LINKED.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/system/my-profile/oidc-links/error?code=IDENTITY_ALREADY_LINKED");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: PROVIDER_NOT_FOUND は /system/my-profile/oidc-links/error へ")
+    void onFailure_providerNotFound_redirectsToOidcLinkError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(IdentityLinkError.PROVIDER_NOT_FOUND.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/system/my-profile/oidc-links/error?code=PROVIDER_NOT_FOUND");
     }
 
 }

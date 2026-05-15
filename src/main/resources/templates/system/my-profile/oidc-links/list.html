@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.oidc-links.list.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile}"
+                               th:text="#{system.my-profile.title}">プロフィール設定</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.my-profile.oidc-links.list.breadcrumb}">
+                            連携OIDCプロバイダー
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル + 追加ボタン -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-link-45deg me-2"></i>
+                        <span th:text="#{system.my-profile.oidc-links.list.title}">
+                            連携OIDCプロバイダー
+                        </span>
+                    </h1>
+                    <a class="btn btn-primary"
+                       th:href="@{/system/my-profile/oidc-links/add}">
+                        <i class="bi bi-plus-lg me-1"></i>
+                        <span th:text="#{system.my-profile.oidc-links.list.button.add}">
+                            連携を追加
+                        </span>
+                    </a>
+                </div>
+
+                <!-- 説明 -->
+                <p class="text-muted mb-4"
+                   th:text="#{system.my-profile.oidc-links.list.description}">
+                    あなたのアカウントでログインに利用できるOIDCプロバイダーの一覧です。
+                </p>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}"
+                     class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"
+                            aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ -->
+                <div th:if="${flashErrorKey}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="#{__${flashErrorKey}__}">エラーが発生しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"
+                            aria-label="Close"></button>
+                </div>
+
+                <!-- 一覧テーブル -->
+                <div class="card">
+                    <div class="card-body p-0">
+
+                        <!-- 0件 -->
+                        <div th:if="${#lists.isEmpty(items)}" class="text-center py-5">
+                            <i class="bi bi-inbox text-secondary" style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted mb-0"
+                               th:text="#{system.my-profile.oidc-links.list.empty}">
+                                連携済みのプロバイダーはありません。
+                            </p>
+                        </div>
+
+                        <!-- 1件以上 -->
+                        <table th:if="${not #lists.isEmpty(items)}"
+                               class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th th:text="#{system.my-profile.oidc-links.list.column.provider}">
+                                        プロバイダー
+                                    </th>
+                                    <th th:text="#{system.my-profile.oidc-links.list.column.sub}">
+                                        Subject
+                                    </th>
+                                    <th th:text="#{system.my-profile.oidc-links.list.column.status}">
+                                        ステータス
+                                    </th>
+                                    <th class="text-end"
+                                        th:text="#{system.my-profile.oidc-links.list.column.actions}">
+                                        操作
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="item : ${items}">
+                                    <td>
+                                        <!-- プロバイダー表示名 (null時はissをフォールバック表示) -->
+                                        <div th:if="${item.providerDisplayName != null}"
+                                             th:text="${item.providerDisplayName}">
+                                            Keycloak Master
+                                        </div>
+                                        <div th:if="${item.providerDisplayName == null}"
+                                             class="text-muted small">
+                                            <i class="bi bi-exclamation-circle me-1"></i>
+                                            <span th:text="#{system.my-profile.oidc-links.list.note.providerUnknown}">
+                                                未登録プロバイダー
+                                            </span>
+                                        </div>
+                                        <code class="text-muted small" th:text="${item.iss}">
+                                            https://auth.example/realms/master
+                                        </code>
+                                        <!-- providerがDISABLEDな場合の補足 -->
+                                        <div th:if="${item.providerDisplayName != null and not item.providerEnabled}"
+                                             class="mt-1">
+                                            <span class="badge bg-warning text-dark small"
+                                                  th:text="#{system.my-profile.oidc-links.list.badge.providerDisabled}">
+                                                プロバイダーは無効化されています
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <code class="small text-muted" th:text="${item.sub}">
+                                            user-uuid-123
+                                        </code>
+                                    </td>
+                                    <td>
+                                        <!-- ACTIVE -->
+                                        <span th:if="${item.active}" class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <span th:text="#{system.my-profile.oidc-links.list.status.active}">
+                                                有効
+                                            </span>
+                                        </span>
+                                        <!-- INACTIVE -->
+                                        <span th:unless="${item.active}" class="badge bg-secondary">
+                                            <i class="bi bi-pause-circle me-1"></i>
+                                            <span th:text="#{system.my-profile.oidc-links.list.status.inactive}">
+                                                解除済
+                                            </span>
+                                        </span>
+                                        <!-- 現セッション中マーク -->
+                                        <span th:if="${item.currentSession}"
+                                              class="badge bg-info text-dark ms-1">
+                                            <i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>
+                                            <span th:text="#{system.my-profile.oidc-links.list.badge.currentSession}">
+                                                現在ログイン中
+                                            </span>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <!-- 解除可能条件: ACTIVE かつ 現セッションで使用していない かつ ACTIVE件数>=2 -->
+                                        <th:block th:if="${item.active and not item.currentSession and activeCount &gt;= 2}">
+                                            <form th:action="@{/system/my-profile/oidc-links/{id}/unlink(id=${item.identityId})}"
+                                                  method="post"
+                                                  class="d-inline"
+                                                  th:onsubmit="|return confirm('[[#{system.my-profile.oidc-links.list.confirm.unlink}]]');|">
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-link-45deg"></i>
+                                                    <span th:text="#{system.my-profile.oidc-links.list.action.unlink}">
+                                                        解除
+                                                    </span>
+                                                </button>
+                                            </form>
+                                        </th:block>
+                                        <!-- 解除不可の理由表示 -->
+                                        <small class="text-muted"
+                                               th:if="${item.active and item.currentSession}"
+                                               th:text="#{system.my-profile.oidc-links.list.cannotUnlink.currentSession}">
+                                            現セッション使用中
+                                        </small>
+                                        <small class="text-muted"
+                                               th:if="${item.active and not item.currentSession and activeCount &lt; 2}"
+                                               th:text="#{system.my-profile.oidc-links.list.cannotUnlink.lastActive}">
+                                            最後の有効な連携
+                                        </small>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+
+                <!-- 戻るボタン -->
+                <div class="mt-4">
+                    <a class="btn btn-outline-secondary" th:href="@{/system/my-profile}">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.my-profile.oidc-links.list.button.back}">
+                            プロフィール設定に戻る
+                        </span>
+                    </a>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>
