@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.localization.edit.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile}"
+                               th:text="#{system.my-profile.title}">プロフィール設定</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile/localization}"
+                               th:text="#{system.my-profile.localization.detail.breadcrumb}">
+                                言語・タイムゾーン
+                            </a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.my-profile.localization.edit.breadcrumb}">編集</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-translate me-2"></i>
+                        <span th:text="#{system.my-profile.localization.edit.title}">
+                            言語・タイムゾーン設定編集
+                        </span>
+                    </h1>
+                </div>
+
+                <!-- 編集フォーム -->
+                <form th:action="@{/system/my-profile/localization}"
+                      th:object="${myLocalizationEditForm}"
+                      method="post"
+                      novalidate>
+
+                    <!-- グローバルエラー -->
+                    <div th:if="${#fields.hasGlobalErrors()}"
+                         class="alert alert-danger small mb-3">
+                        <i class="bi bi-exclamation-triangle me-1"></i>
+                        <ul class="mb-0">
+                            <li th:each="err : ${#fields.globalErrors()}"
+                                th:text="${err}">エラー</li>
+                        </ul>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- 言語選択                                                      -->
+                    <!-- ============================================================ -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-chat-left-text me-2"></i>
+                                <span th:text="#{system.my-profile.localization.edit.section.language}">言語</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-translate me-1"></i>
+                                <span th:text="#{system.my-profile.localization.field.language}">言語</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select name="language"
+                                    id="language"
+                                    class="form-select"
+                                    th:classappend="${#fields.hasErrors('language')} ? 'is-invalid' : ''"
+                                    required>
+                                <option value="" disabled
+                                        th:text="#{system.my-profile.localization.edit.placeholder.language}"
+                                        th:selected="${myLocalizationEditForm.language == null}">
+                                    選択してください
+                                </option>
+                                <option th:each="opt : ${languageChoices}"
+                                        th:value="${opt.name()}"
+                                        th:text="${opt.displayName}"
+                                        th:selected="${myLocalizationEditForm.language != null and myLocalizationEditForm.language == opt}">
+                                </option>
+                            </select>
+                            <div class="invalid-feedback"
+                                 th:if="${#fields.hasErrors('language')}"
+                                 th:errors="*{language}">エラー</div>
+                            <div class="form-text small mt-2"
+                                 th:text="#{system.my-profile.localization.edit.help.language}">
+                                システム管理者が許可した言語の中から選択できます。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ============================================================ -->
+                    <!-- タイムゾーン選択                                              -->
+                    <!-- ============================================================ -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-clock me-2"></i>
+                                <span th:text="#{system.my-profile.localization.edit.section.timezone}">タイムゾーン</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <label class="form-label fw-semibold">
+                                <i class="bi bi-clock me-1"></i>
+                                <span th:text="#{system.my-profile.localization.field.timezone}">タイムゾーン</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <select name="timezone"
+                                    id="timezone"
+                                    class="form-select"
+                                    th:classappend="${#fields.hasErrors('timezone')} ? 'is-invalid' : ''"
+                                    required>
+                                <option value="" disabled
+                                        th:text="#{system.my-profile.localization.edit.placeholder.timezone}"
+                                        th:selected="${myLocalizationEditForm.timezone == null}">
+                                    選択してください
+                                </option>
+                                <option th:each="opt : ${timezoneOptions}"
+                                        th:value="${opt.id}"
+                                        th:text="${opt.displayName}"
+                                        th:selected="${myLocalizationEditForm.timezone != null and myLocalizationEditForm.timezone.id == opt.id}">
+                                </option>
+                            </select>
+                            <div class="invalid-feedback"
+                                 th:if="${#fields.hasErrors('timezone')}"
+                                 th:errors="*{timezone}">エラー</div>
+                            <div class="form-text small mt-2"
+                                 th:text="#{system.my-profile.localization.edit.help.timezone}">
+                                システム管理者が許可したタイムゾーンの中から選択できます。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ボタン -->
+                    <div class="d-flex gap-2 mb-4">
+                        <button type="submit" class="btn btn-primary" id="saveBtn">
+                            <i class="bi bi-check-lg me-1"></i>
+                            <span th:text="#{system.my-profile.localization.edit.button.save}">保存</span>
+                        </button>
+                        <a th:href="@{/system/my-profile/localization}"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>
+                            <span th:text="#{system.my-profile.localization.edit.button.cancel}">キャンセル</span>
+                        </a>
+                    </div>
+
+                </form>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

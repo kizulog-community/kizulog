@@ -1,6 +1,7 @@
 package io.github.kizulog_community.kizulog.domain.systemconfig.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -48,6 +49,18 @@ class LocalizationConfigErrorTest {
     }
 
     @Test
+    @DisplayName("LANGUAGE_IN_USE_BY_ACCOUNTが定義されている")
+    void values_containsLanguageInUseByAccount() {
+        assertThat(LocalizationConfigError.LANGUAGE_IN_USE_BY_ACCOUNT).isNotNull();
+    }
+
+    @Test
+    @DisplayName("TIMEZONE_IN_USE_BY_ACCOUNTが定義されている")
+    void values_containsTimezoneInUseByAccount() {
+        assertThat(LocalizationConfigError.TIMEZONE_IN_USE_BY_ACCOUNT).isNotNull();
+    }
+
+    @Test
     @DisplayName("SERIALIZATION_FAILEDが定義されている")
     void values_containsSerializationFailed() {
         assertThat(LocalizationConfigError.SERIALIZATION_FAILED).isNotNull();
@@ -60,9 +73,9 @@ class LocalizationConfigErrorTest {
     }
 
     @Test
-    @DisplayName("values()は8件の要素を返す")
-    void values_returnsEightElements() {
-        assertThat(LocalizationConfigError.values()).hasSize(8);
+    @DisplayName("values()は10件の要素を返す")
+    void values_returnsTenElements() {
+        assertThat(LocalizationConfigError.values()).hasSize(10);
     }
 
     @Test

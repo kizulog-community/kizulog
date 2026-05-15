@@ -2,6 +2,7 @@ package io.github.kizulog_community.kizulog.infrastructure.web.system.systemsett
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -27,6 +28,7 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributesModelMap;
 
 import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.service.AccountLocalizationApplicationService;
 import io.github.kizulog_community.kizulog.domain.systemconfig.exception.LocalizationConfigError;
 import io.github.kizulog_community.kizulog.domain.systemconfig.exception.LocalizationConfigException;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.LanguageSetting;
@@ -50,6 +52,7 @@ class LocalizationControllerTest {
 
     private LocalizationSettingService localizationSettingService;
     private SystemConfigService systemConfigService;
+    private AccountLocalizationApplicationService accountLocalizationApplicationService;
     private MessageSource messageSource;
     private LocalizationController controller;
 
@@ -61,9 +64,14 @@ class LocalizationControllerTest {
     void setUp() {
         localizationSettingService = mock(LocalizationSettingService.class);
         systemConfigService = mock(SystemConfigService.class);
+        accountLocalizationApplicationService =
+                mock(AccountLocalizationApplicationService.class);
         messageSource = mock(MessageSource.class);
         controller = new LocalizationController(
-                localizationSettingService, systemConfigService, messageSource);
+                localizationSettingService,
+                systemConfigService,
+                accountLocalizationApplicationService,
+                messageSource);
 
         model = new ConcurrentModel();
         redirectAttrs = new RedirectAttributesModelMap();
@@ -96,10 +104,6 @@ class LocalizationControllerTest {
                 "{\"DEFAULT\":\"Asia/Tokyo\",\"AVAILABLE\":[\"Asia/Tokyo\"]}",
                 BASE_TIME, "system:setup-wizard");
     }
-
-    // ============================================================
-    // detail
-    // ============================================================
 
     @Test
     @DisplayName("detail: 言語・タイムゾーン共に保存済の場合、両方の値がmodelに設定される")
@@ -181,10 +185,6 @@ class LocalizationControllerTest {
         assertThat(v.isTimezoneConfigured()).isTrue();
     }
 
-    // ============================================================
-    // editForm
-    // ============================================================
-
     @Test
     @DisplayName("editForm: 既存値がない場合、空フォームと timezonesJson/selectedTimezones を設定")
     void editForm_emptyForm_whenNothingConfigured() {
@@ -260,10 +260,6 @@ class LocalizationControllerTest {
         assertThat(model.getAttribute("timezonesJson")).isNotNull();
     }
 
-    // ============================================================
-    // save - 成功系
-    // ============================================================
-
     @Test
     @DisplayName("save: 正常系で言語・TZが保存され詳細画面へリダイレクト")
     void save_success_redirectsToDetail() {
@@ -273,6 +269,13 @@ class LocalizationControllerTest {
         form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        // 現在の設定をモック（除外対象なしのため使用中チェックは通過）
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(new LanguageSetting(
+                        SupportedLanguage.JA, List.of(SupportedLanguage.JA))));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
 
         String view = controller.save(
                 form, br, principal, Locale.ENGLISH, redirectAttrs, model);
@@ -296,6 +299,12 @@ class LocalizationControllerTest {
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
 
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(new LanguageSetting(
+                        SupportedLanguage.JA, List.of(SupportedLanguage.JA))));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+
         org.mockito.ArgumentCaptor<String> captor =
                 org.mockito.ArgumentCaptor.forClass(String.class);
 
@@ -306,9 +315,29 @@ class LocalizationControllerTest {
         assertThat(captor.getValue()).isEqualTo("system");
     }
 
-    // ============================================================
-    // save - バリデーション失敗
-    // ============================================================
+    @Test
+    @DisplayName("save: 現在の設定が未登録（新規時）は使用中チェックスキップで保存される")
+    void save_currentSettingNotConfigured_skipsInUseCheckAndSaves() {
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
+
+        String view = controller.save(
+                form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(view).isEqualTo("redirect:/system/system-settings/localization");
+        // 現在の設定が無い → ACTIVE件数取得は呼ばれない
+        verify(accountLocalizationApplicationService, never())
+                .countActiveAccountsUsingLanguage(any());
+        verify(accountLocalizationApplicationService, never())
+                .countActiveAccountsUsingTimezone(any());
+    }
 
     @Test
     @DisplayName("save: BindingResultにエラーがある場合、編集画面を再表示")
@@ -336,6 +365,9 @@ class LocalizationControllerTest {
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
 
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
+
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.DEFAULT_LANGUAGE_NOT_IN_AVAILABLE))
                 .when(localizationSettingService)
@@ -360,6 +392,9 @@ class LocalizationControllerTest {
         form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
         form.setAvailableTimezones(List.of(SupportedTimezone.of("UTC"))); // 不整合
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
 
         // 言語保存は成功させる
         doThrow(new LocalizationConfigException(
@@ -387,6 +422,9 @@ class LocalizationControllerTest {
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
 
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
+
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.AVAILABLE_LANGUAGES_EMPTY))
                 .when(localizationSettingService)
@@ -406,6 +444,9 @@ class LocalizationControllerTest {
         form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
 
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.AVAILABLE_TIMEZONES_EMPTY))
@@ -427,6 +468,9 @@ class LocalizationControllerTest {
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
 
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
+
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.DEFAULT_LANGUAGE_REQUIRED))
                 .when(localizationSettingService)
@@ -446,6 +490,9 @@ class LocalizationControllerTest {
         form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
 
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.DEFAULT_TIMEZONE_REQUIRED))
@@ -467,6 +514,9 @@ class LocalizationControllerTest {
         form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
         BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
 
+        when(localizationSettingService.getLanguageSetting()).thenReturn(Optional.empty());
+        when(localizationSettingService.getTimezoneSetting()).thenReturn(Optional.empty());
+
         doThrow(new LocalizationConfigException(
                 LocalizationConfigError.SERIALIZATION_FAILED))
                 .when(localizationSettingService)
@@ -476,6 +526,198 @@ class LocalizationControllerTest {
 
         assertThat(br.hasFieldErrors()).isFalse();
         assertThat(br.hasGlobalErrors()).isTrue();
+    }
+
+    @Test
+    @DisplayName("save: 使用中の言語が新AVAILABLEから除外される場合、availableLanguagesフィールドエラー")
+    void save_languageInUseRemoved_addsAvailableLanguagesFieldError() {
+        // 現在のシステム側AVAILABLE: [JA, EN]
+        // 新AVAILABLE: [JA]  ← ENを除外
+        // ACTIVEなアカウントの中で EN を使用中: 2件
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(languageSettingJa()));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.EN))
+                .thenReturn(2);
+        // JAは新AVAILABLEに含まれているのでチェック不要だが、安全側で0返す
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.JA))
+                .thenReturn(0);
+
+        String view = controller.save(
+                form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(view).isEqualTo("system/system-settings/localization/edit");
+        assertThat(br.hasFieldErrors("availableLanguages")).isTrue();
+        // 保存は呼ばれていない
+        verify(localizationSettingService, never())
+                .saveLanguageSetting(any(LanguageSetting.class), any(String.class));
+        verify(localizationSettingService, never())
+                .saveTimezoneSetting(any(TimezoneSetting.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("save: 使用中のTZが新AVAILABLEから除外される場合、availableTimezonesフィールドエラー")
+    void save_timezoneInUseRemoved_addsAvailableTimezonesFieldError() {
+        // 現在: [Asia/Tokyo]、新: [America/New_York] → Asia/Tokyoを除外
+        // Asia/Tokyo を ACTIVE で使用中: 3件
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("America/New_York"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("America/New_York")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(languageSettingJa()));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+        // 言語側は変更なし（JA in new AVAILABLE, EN除外もMockで0返す）
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.EN))
+                .thenReturn(0);
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingTimezone(SupportedTimezone.of("Asia/Tokyo")))
+                .thenReturn(3);
+
+        String view = controller.save(
+                form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(view).isEqualTo("system/system-settings/localization/edit");
+        assertThat(br.hasFieldErrors("availableTimezones")).isTrue();
+        verify(localizationSettingService, never())
+                .saveLanguageSetting(any(LanguageSetting.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("save: 複数の使用中言語が除外される場合、件数は合算される")
+    void save_multipleLanguagesInUseRemoved_sumsCount() {
+        // 現在AVAILABLE: [JA, EN] → 新: [] （両方除外）
+        // ※ availableLanguagesEmptyはService側で別エラーになるが、
+        //   ここでは使用中チェックが先に走ることを確認するため、
+        //   新AVAILABLE=[XX]のような形でJA/EN両方除外する状況を作る
+        // ただし2言語しかenum値が無いため、AVAILABLEを空にして
+        // 「両方使用中で除外される」状況をシミュレートする
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of()); // 両方除外
+        form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(languageSettingJa()));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.JA))
+                .thenReturn(3);
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.EN))
+                .thenReturn(2);
+
+        controller.save(form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(br.hasFieldErrors("availableLanguages")).isTrue();
+        // メッセージ取得時に件数 5 が渡されていることを確認
+        verify(messageSource).getMessage(
+                eq("system.localization.error.LANGUAGE_IN_USE_BY_ACCOUNT"),
+                eq(new Object[] { 5 }),
+                any(),
+                any(Locale.class));
+    }
+
+    @Test
+    @DisplayName("save: 使用中件数が0なら通常通り保存される")
+    void save_inUseCountIsZero_proceedsToSave() {
+        // 現在: [JA, EN] → 新: [JA]  ENは使用中件数0
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(languageSettingJa()));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.EN))
+                .thenReturn(0);
+
+        String view = controller.save(
+                form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(view).isEqualTo("redirect:/system/system-settings/localization");
+        verify(localizationSettingService).saveLanguageSetting(
+                any(LanguageSetting.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("save: 言語・TZの両方で使用中エラー → 両フィールドにエラー登録")
+    void save_bothLanguageAndTimezoneInUse_addsBothFieldErrors() {
+        // 言語: EN除外で2件、TZ: Asia/Tokyo除外で3件
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("America/New_York"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("America/New_York")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        when(localizationSettingService.getLanguageSetting())
+                .thenReturn(Optional.of(languageSettingJa()));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingLanguage(SupportedLanguage.EN))
+                .thenReturn(2);
+        when(accountLocalizationApplicationService
+                .countActiveAccountsUsingTimezone(SupportedTimezone.of("Asia/Tokyo")))
+                .thenReturn(3);
+
+        controller.save(form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        assertThat(br.hasFieldErrors("availableLanguages")).isTrue();
+        assertThat(br.hasFieldErrors("availableTimezones")).isTrue();
+        verify(localizationSettingService, never())
+                .saveLanguageSetting(any(LanguageSetting.class), any(String.class));
+    }
+
+    @Test
+    @DisplayName("save: 使用中チェックは現在の言語設定取得失敗時にスキップされる（フォールバック）")
+    void save_languageSettingDeserializationFails_skipsInUseCheckForLanguage() {
+        LocalizationEditForm form = new LocalizationEditForm();
+        form.setDefaultLanguage(SupportedLanguage.JA);
+        form.setAvailableLanguages(List.of(SupportedLanguage.JA));
+        form.setDefaultTimezone(SupportedTimezone.of("Asia/Tokyo"));
+        form.setAvailableTimezones(List.of(SupportedTimezone.of("Asia/Tokyo")));
+        BindingResult br = new BeanPropertyBindingResult(form, "localizationEditForm");
+
+        // 言語設定取得が例外（デシリアライズ失敗）
+        when(localizationSettingService.getLanguageSetting())
+                .thenThrow(new LocalizationConfigException(
+                        LocalizationConfigError.DESERIALIZATION_FAILED));
+        when(localizationSettingService.getTimezoneSetting())
+                .thenReturn(Optional.of(timezoneSettingTokyo()));
+
+        controller.save(form, br, principal, Locale.ENGLISH, redirectAttrs, model);
+
+        // 言語側の使用中件数取得は呼ばれない
+        verify(accountLocalizationApplicationService, never())
+                .countActiveAccountsUsingLanguage(any());
+        // 保存処理は実行された
+        verify(localizationSettingService).saveLanguageSetting(
+                any(LanguageSetting.class), any(String.class));
     }
 
 }

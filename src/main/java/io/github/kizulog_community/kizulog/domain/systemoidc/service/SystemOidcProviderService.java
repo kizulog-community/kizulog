@@ -80,7 +80,7 @@ public class SystemOidcProviderService {
     }
 
     /**
-     * 新規OIDCプロバイダーを保存する（プロバイダー本体 + ステータスをセットで保存）。
+     * 新規OIDCプロバイダーを保存する（プロバイダー本体 + ステータスをセットで保存）
      */
     @Transactional
     public void register(
@@ -93,12 +93,13 @@ public class SystemOidcProviderService {
             OffsetDateTime version,
             String createdBy) {
         String encryptedSecret = cryptoPort.encrypt(plainClientSecret);
+        String normalizedUri = normalizeUri(uri);
 
         providerRepository.save(new SystemOidcProvider(
                 providerId,
                 version,
                 displayName,
-                uri,
+                normalizedUri,
                 clientId,
                 encryptedSecret,
                 version,
@@ -111,6 +112,29 @@ public class SystemOidcProviderService {
                 null,
                 version,
                 createdBy));
+    }
+
+    /**
+     * OIDC issuer URIを比較可能な正規形に変換する。
+     *
+     * <p>正規化ルール:
+     * <ul>
+     * <li>前後の空白を除去（フォーム入力ミス対策）</li>
+     * <li>末尾スラッシュを1つだけ除去（OIDCで一般的な不一致原因）</li>
+     * </ul>
+     *
+     * @param uri 入力URI
+     * @return 正規化済みURI、nullの場合はnullを返す
+     */
+    static String normalizeUri(String uri) {
+        if (uri == null) {
+            return null;
+        }
+        String trimmed = uri.trim();
+        if (trimmed.endsWith("/")) {
+            return trimmed.substring(0, trimmed.length() - 1);
+        }
+        return trimmed;
     }
 
     /**
@@ -179,8 +203,8 @@ public class SystemOidcProviderService {
      *
      * <p>事前条件:</p>
      * <ul>
-     *   <li>プロバイダーが存在する</li>
-     *   <li>現在のステータスがDISABLEDである（既にENABLEDならエラー）</li>
+     * <li>プロバイダーが存在する</li>
+     * <li>現在のステータスがDISABLEDである（既にENABLEDならエラー）</li>
      * </ul>
      *
      * @param providerId プロバイダーID
@@ -213,9 +237,9 @@ public class SystemOidcProviderService {
      *
      * <p>事前条件:</p>
      * <ul>
-     *   <li>プロバイダーが存在する</li>
-     *   <li>現在のステータスがENABLEDである（既にDISABLEDならエラー）</li>
-     *   <li>無効化後も最低1つのENABLEDなプロバイダーが残る</li>
+     * <li>プロバイダーが存在する</li>
+     * <li>現在のステータスがENABLEDである（既にDISABLEDならエラー）</li>
+     * <li>無効化後も最低1つのENABLEDなプロバイダーが残る</li>
      * </ul>
      *
      * @param providerId プロバイダーID
@@ -251,13 +275,6 @@ public class SystemOidcProviderService {
     /**
      * 指定プロバイダーを除いて、現在ENABLEDな他のプロバイダー数を取得する。
      *
-     * <p>UI事前ガード（「最後の1件は無効化できない」を画面側で表現する）と、
-     * disable() 時のサーバー側制約チェックの両方で使用される。</p>
-     *
-     * <p>戻り値が 0 ならば、 excludingProviderId を無効化すると ENABLED が
-     * 1件もなくなることを意味する。1以上ならば、excludingProviderId を
-     * 無効化しても他にENABLEDが残るため、無効化操作が許される。</p>
-     *
      * @param excludingProviderId 除外するプロバイダーID（通常は無効化対象）
      * @return ENABLED状態の他のプロバイダー数
      */
@@ -271,15 +288,9 @@ public class SystemOidcProviderService {
     }
 
     /**
-     * ログイン画面表示用に、ENABLEDな全プロバイダーを軽量ビューで取得する。
+     * ログイン画面表示用に、ENABLEDな全プロバイダーをビューで取得する。
      *
-     * <p>未認証画面で表示するため、client_secret等の機密情報は一切含めない。
-     * provider_id と displayName のみを保持した軽量ビューを返す。</p>
-     *
-     * <p>並び順は displayName の大小文字無視・自然順。
-     * 該当プロバイダーが0件の場合は空リストを返す。</p>
-     *
-     * @return ENABLEDなプロバイダーの軽量Viewリスト
+     * @return ENABLEDなプロバイダーのViewリスト
      */
     @Transactional(readOnly = true)
     public List<EnabledProviderView> listEnabledForLogin() {

@@ -18,7 +18,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.service.AccountLocalizationApplicationService;
 import io.github.kizulog_community.kizulog.domain.systemconfig.exception.LocalizationConfigError;
 import io.github.kizulog_community.kizulog.domain.systemconfig.exception.LocalizationConfigException;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.LanguageSetting;
@@ -52,11 +54,22 @@ public class LocalizationController {
     /** ロガー */
     private static final Logger log = LoggerFactory.getLogger(LocalizationController.class);
 
+    /** メッセージキー：言語使用中エラー（パラメータ {0} に件数を埋め込む） */
+    private static final String MSG_KEY_LANGUAGE_IN_USE =
+            "system.localization.error.LANGUAGE_IN_USE_BY_ACCOUNT";
+
+    /** メッセージキー：TZ使用中エラー（パラメータ {0} に件数を埋め込む） */
+    private static final String MSG_KEY_TIMEZONE_IN_USE =
+            "system.localization.error.TIMEZONE_IN_USE_BY_ACCOUNT";
+
     /** 言語・タイムゾーン設定サービス */
     private final LocalizationSettingService localizationSettingService;
 
     /** システム設定サービス（監査情報取得用） */
     private final SystemConfigService systemConfigService;
+
+    /** アカウント単位localizationサービス（使用中検証用） */
+    private final AccountLocalizationApplicationService accountLocalizationApplicationService;
 
     /** メッセージソース */
     private final MessageSource messageSource;
@@ -109,17 +122,6 @@ public class LocalizationController {
     /**
      * 言語・タイムゾーン設定を保存する。
      *
-     * <p>処理順序：
-     * <ol>
-     * <li>アノテーション検証（null/empty）</li>
-     * <li>{@code LocalizationSettingService}でクロスフィールド検証＋保存</li>
-     * <li>成功時：詳細画面へリダイレクト（PRGパターン）</li>
-     * <li>失敗時：編集画面を再表示し、エラーメッセージを表示</li>
-     * </ol>
-     *
-     * <p>言語とタイムゾーンを順次保存するため、片方が成功し片方が失敗する可能性がある。
-     * バリデーションは保存前に両方実施し、両方OKであることを確認してから保存する。</p>
-     *
      * @param form 編集フォーム
      * @param bindingResult バインディング結果
      * @param principal 認証済みプリンシパル
@@ -138,6 +140,16 @@ public class LocalizationController {
             Model model) {
 
         if (bindingResult.hasErrors()) {
+            addTimezoneOptionsToModel(form, model);
+            model.addAttribute("activeMenu", "system-settings");
+            return "system/system-settings/localization/edit";
+        }
+
+        // 使用中チェック：ACTIVEアカウントが使用中の言語/TZが
+        // 新AVAILABLEから外れる場合はエラー
+        boolean inUseError = validateNotRemovingInUseLanguages(form, bindingResult, locale)
+                | validateNotRemovingInUseTimezones(form, bindingResult, locale);
+        if (inUseError) {
             addTimezoneOptionsToModel(form, model);
             model.addAttribute("activeMenu", "system-settings");
             return "system/system-settings/localization/edit";
@@ -173,6 +185,95 @@ public class LocalizationController {
         redirectAttrs.addFlashAttribute("flashSuccessKey",
                 "system.localization.form.success.updated");
         return "redirect:/system/system-settings/localization";
+    }
+
+    /**
+     * 「ACTIVEアカウントが使用中の言語」のうち、新AVAILABLEから除外されるものを検出する。
+     *
+     * @param form フォーム（新AVAILABLEを含む）
+     * @param bindingResult バインディング結果
+     * @param locale ロケール
+     * @return エラーが検出された場合true
+     */
+    private boolean validateNotRemovingInUseLanguages(
+            LocalizationEditForm form, BindingResult bindingResult, Locale locale) {
+        Optional<LanguageSetting> currentOpt = safeGetLanguage();
+        if (currentOpt.isEmpty()) {
+            // 新規登録時は使用中チェック不要（アカウントlocalizationもまだ無い前提）
+            return false;
+        }
+
+        List<SupportedLanguage> newAvailable = form.getAvailableLanguages() == null
+                ? List.of()
+                : form.getAvailableLanguages();
+
+        int totalInUse = 0;
+        for (SupportedLanguage current : currentOpt.get().getAvailableLanguages()) {
+            if (newAvailable.contains(current)) {
+                continue;
+            }
+            int count = accountLocalizationApplicationService
+                    .countActiveAccountsUsingLanguage(current);
+            totalInUse += count;
+        }
+
+        if (totalInUse == 0) {
+            return false;
+        }
+
+        String msg = messageSource.getMessage(
+                MSG_KEY_LANGUAGE_IN_USE,
+                new Object[] { totalInUse },
+                "This language is in use",
+                locale);
+        bindingResult.rejectValue("availableLanguages",
+                LocalizationConfigError.LANGUAGE_IN_USE_BY_ACCOUNT.name(), msg);
+        log.info("言語の使用中チェックでエラー: 影響アカウント件数={}", totalInUse);
+        return true;
+    }
+
+    /**
+     * 「ACTIVEアカウントが使用中のTZ」のうち、新AVAILABLEから除外されるものを検出する。
+     *
+     * @param form フォーム
+     * @param bindingResult バインディング結果
+     * @param locale ロケール
+     * @return エラーが検出された場合true
+     */
+    private boolean validateNotRemovingInUseTimezones(
+            LocalizationEditForm form, BindingResult bindingResult, Locale locale) {
+        Optional<TimezoneSetting> currentOpt = safeGetTimezone();
+        if (currentOpt.isEmpty()) {
+            return false;
+        }
+
+        List<SupportedTimezone> newAvailable = form.getAvailableTimezones() == null
+                ? List.of()
+                : form.getAvailableTimezones();
+
+        int totalInUse = 0;
+        for (SupportedTimezone current : currentOpt.get().getAvailableTimezones()) {
+            if (newAvailable.contains(current)) {
+                continue;
+            }
+            int count = accountLocalizationApplicationService
+                    .countActiveAccountsUsingTimezone(current);
+            totalInUse += count;
+        }
+
+        if (totalInUse == 0) {
+            return false;
+        }
+
+        String msg = messageSource.getMessage(
+                MSG_KEY_TIMEZONE_IN_USE,
+                new Object[] { totalInUse },
+                "This timezone is in use",
+                locale);
+        bindingResult.rejectValue("availableTimezones",
+                LocalizationConfigError.TIMEZONE_IN_USE_BY_ACCOUNT.name(), msg);
+        log.info("タイムゾーンの使用中チェックでエラー: 影響アカウント件数={}", totalInUse);
+        return true;
     }
 
     /**
@@ -284,10 +385,12 @@ public class LocalizationController {
         return switch (error) {
             case DEFAULT_LANGUAGE_REQUIRED,
                  DEFAULT_LANGUAGE_NOT_IN_AVAILABLE -> "defaultLanguage";
-            case AVAILABLE_LANGUAGES_EMPTY -> "availableLanguages";
+            case AVAILABLE_LANGUAGES_EMPTY,
+                 LANGUAGE_IN_USE_BY_ACCOUNT -> "availableLanguages";
             case DEFAULT_TIMEZONE_REQUIRED,
                  DEFAULT_TIMEZONE_NOT_IN_AVAILABLE -> "defaultTimezone";
-            case AVAILABLE_TIMEZONES_EMPTY -> "availableTimezones";
+            case AVAILABLE_TIMEZONES_EMPTY,
+                 TIMEZONE_IN_USE_BY_ACCOUNT -> "availableTimezones";
             case SERIALIZATION_FAILED,
                  DESERIALIZATION_FAILED -> null;
         };

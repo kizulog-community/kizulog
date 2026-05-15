@@ -23,6 +23,7 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.service.AccountLocalizationApplicationService;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -62,6 +63,9 @@ public class InvitationAcceptanceService {
     /** 招待サービス */
     private final SystemAdminInvitationService invitationService;
 
+    /** アカウントlocalizationサービス（K.5でシステムデフォルト自動適用用に追加） */
+    private final AccountLocalizationApplicationService accountLocalizationApplicationService;
+
     /**
      * 招待を受諾し、新規システム管理者アカウントを作成する。
      *
@@ -70,10 +74,11 @@ public class InvitationAcceptanceService {
      * <li>SystemAccount 新規作成（ACTIVE）</li>
      * <li>SystemAccountIdentity 新規作成（ACTIVE、iss/aud/sub を保存）</li>
      * <li>SystemAccountRole SYSTEM_ADMIN 付与（ACTIVE）</li>
+     * <li>アカウント単位のシステムデフォルト言語・タイムゾーン適用</li>
      * <li>招待を USED 状態に更新</li>
      * </ol>
-     * すべて同一トランザクション・同一バージョン。</p>
-     *
+     * </p>
+     * 
      * @param invitationId 検証済み招待ID
      * @param iss OIDC Issuer
      * @param aud OIDC Audience（client_id）
@@ -116,7 +121,11 @@ public class InvitationAcceptanceService {
         systemAccountRoleStatusRepository.save(new SystemAccountRoleStatus(
                 roleId, version, AccountStatus.ACTIVE, null, version, createdBy));
 
-        // 7. 招待を USED 状態に更新（同一トランザクションに参加）
+        // 7. アカウント単位のシステムデフォルト言語・タイムゾーン適用
+        accountLocalizationApplicationService
+                .createDefaultLocalizationForAccount(accountId, createdBy);
+
+        // 8. 招待を USED 状態に更新（同一トランザクションに参加）
         invitationService.markAsUsed(invitationId, createdBy);
 
         log.info("招待を受諾して新規システム管理者を作成しました: "

@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-person-gear me-2"></i>
+                        <span th:text="#{system.my-profile.title}">プロフィール設定</span>
+                    </h1>
+                </div>
+
+                <p class="text-muted mb-4" th:text="#{system.my-profile.description}">
+                    あなた自身の利用設定を管理します。
+                </p>
+
+                <!-- 設定カードリスト -->
+                <div class="row g-3">
+
+                    <!-- 言語・タイムゾーン -->
+                    <div class="col-md-6 col-lg-4">
+                        <a th:href="@{/system/my-profile/localization}"
+                           class="card h-100 text-decoration-none text-body myprofile-card">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="myprofile-icon-wrapper bg-info bg-opacity-10 text-info me-3">
+                                        <i class="bi bi-translate"></i>
+                                    </div>
+                                    <h5 class="card-title mb-0"
+                                        th:text="#{system.my-profile.cards.localization.title}">
+                                        言語・タイムゾーン
+                                    </h5>
+                                </div>
+                                <p class="card-text text-muted small mb-0"
+                                   th:text="#{system.my-profile.cards.localization.description}">
+                                    画面表示で使用する言語とタイムゾーンを設定します。
+                                </p>
+                            </div>
+                        </a>
+                    </div>
+
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <!-- ページ固有のスタイル（system-settingsと同じパターン） -->
+    <style>
+        .myprofile-card {
+            border: 1px solid #dee2e6;
+            transition: all 0.2s ease;
+        }
+        .myprofile-card:hover {
+            border-color: #0d6efd;
+            box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+        .myprofile-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+    </style>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

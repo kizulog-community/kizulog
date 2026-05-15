@@ -202,8 +202,8 @@
                         <dl class="row mb-0">
                             <dt class="col-sm-3" th:text="#{system.oidcProviders.field.createdAt}">作成日時</dt>
                             <dd class="col-sm-9"
-                                th:text="${#temporals.format(provider.createdAt, 'yyyy-MM-dd HH:mm:ss z')}">
-                                2026-05-04 02:30:15 UTC
+                                th:text="${@dateTimeFormatHelper.format(provider.createdAt)}">
+                                2026-05-04 11:30:15 JST (Asia/Tokyo)
                             </dd>
 
                             <dt class="col-sm-3" th:text="#{system.oidcProviders.field.createdBy}">作成者</dt>

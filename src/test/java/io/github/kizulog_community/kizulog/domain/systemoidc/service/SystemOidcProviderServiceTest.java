@@ -269,6 +269,119 @@ class SystemOidcProviderServiceTest {
     }
 
     @Test
+    @DisplayName("register: URIの末尾スラッシュが除去されて保存される")
+    void register_stripsTrailingSlashFromUri() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+
+        service.register("master", "Master",
+                "https://auth.example/realms/master/",
+                "client-1", "plain-secret",
+                OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
+
+        ArgumentCaptor<SystemOidcProvider> pCap =
+                ArgumentCaptor.forClass(SystemOidcProvider.class);
+        verify(providerRepository).save(pCap.capture());
+        assertThat(pCap.getValue().getUri())
+                .isEqualTo("https://auth.example/realms/master");
+    }
+
+    @Test
+    @DisplayName("register: URIの前後の空白が除去されて保存される")
+    void register_trimsUriWhitespace() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+
+        service.register("master", "Master",
+                "  https://auth.example/realms/master  ",
+                "client-1", "plain-secret",
+                OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
+
+        ArgumentCaptor<SystemOidcProvider> pCap =
+                ArgumentCaptor.forClass(SystemOidcProvider.class);
+        verify(providerRepository).save(pCap.capture());
+        assertThat(pCap.getValue().getUri())
+                .isEqualTo("https://auth.example/realms/master");
+    }
+
+    @Test
+    @DisplayName("register: URIの前後空白と末尾スラッシュが両方除去されて保存される")
+    void register_trimsAndStripsUri() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+
+        service.register("master", "Master",
+                "  https://auth.example/realms/master/  ",
+                "client-1", "plain-secret",
+                OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
+
+        ArgumentCaptor<SystemOidcProvider> pCap =
+                ArgumentCaptor.forClass(SystemOidcProvider.class);
+        verify(providerRepository).save(pCap.capture());
+        assertThat(pCap.getValue().getUri())
+                .isEqualTo("https://auth.example/realms/master");
+    }
+
+    @Test
+    @DisplayName("register: 末尾スラッシュなしのURIはそのまま保存される")
+    void register_preservesUriWithoutTrailingSlash() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+
+        service.register("master", "Master",
+                "https://auth.example/realms/master",
+                "client-1", "plain-secret",
+                OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
+
+        ArgumentCaptor<SystemOidcProvider> pCap =
+                ArgumentCaptor.forClass(SystemOidcProvider.class);
+        verify(providerRepository).save(pCap.capture());
+        assertThat(pCap.getValue().getUri())
+                .isEqualTo("https://auth.example/realms/master");
+    }
+
+    @Test
+    @DisplayName("register: 大文字小文字は保持される（OIDC仕様により完全一致比較のため変換禁止）")
+    void register_preservesUriCase() {
+        when(cryptoPort.encrypt("plain-secret")).thenReturn("encrypted-secret");
+
+        service.register("master", "Master",
+                "https://AUTH.Example/Realms/Master",
+                "client-1", "plain-secret",
+                OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
+
+        ArgumentCaptor<SystemOidcProvider> pCap =
+                ArgumentCaptor.forClass(SystemOidcProvider.class);
+        verify(providerRepository).save(pCap.capture());
+        assertThat(pCap.getValue().getUri())
+                .isEqualTo("https://AUTH.Example/Realms/Master");
+    }
+
+    @Test
+    @DisplayName("normalizeUri: null入力はnullを返す")
+    void normalizeUri_nullReturnsNull() {
+        assertThat(SystemOidcProviderService.normalizeUri(null)).isNull();
+    }
+
+    @Test
+    @DisplayName("normalizeUri: 末尾スラッシュ1つを除去する")
+    void normalizeUri_stripsSingleTrailingSlash() {
+        assertThat(SystemOidcProviderService.normalizeUri("https://a.example/"))
+                .isEqualTo("https://a.example");
+    }
+
+    @Test
+    @DisplayName("normalizeUri: 末尾スラッシュは1つだけ除去（2つ目は残す）")
+    void normalizeUri_stripsOnlyOneTrailingSlash() {
+        // OIDCのissuer URIで末尾スラッシュが連続することは想定しないが、
+        // 仕様明確化のため：normalize は安全側で1つだけ除去する
+        assertThat(SystemOidcProviderService.normalizeUri("https://a.example//"))
+                .isEqualTo("https://a.example/");
+    }
+
+    @Test
+    @DisplayName("normalizeUri: 空白のみの文字列は空文字を返す")
+    void normalizeUri_whitespaceOnly_returnsEmpty() {
+        assertThat(SystemOidcProviderService.normalizeUri("   ")).isEqualTo("");
+    }
+
+    @Test
     @DisplayName("registerWithValidation: 正常系ではバリデーション通過後にプロバイダーが保存される")
     void registerWithValidation_savesProvider_whenValid() {
         when(providerRepository.existsByProviderId("google")).thenReturn(false);
@@ -703,8 +816,6 @@ class SystemOidcProviderServiceTest {
         verify(statusRepository, never()).save(any());
     }
 
-    // ===== listEnabledForLogin =====
-
     @Test
     @DisplayName("listEnabledForLogin: ENABLEDが0件の場合、空リストを返す")
     void listEnabledForLogin_returnsEmpty_whenNoEnabledProviders() {
@@ -798,8 +909,6 @@ class SystemOidcProviderServiceTest {
         assertThat(result).hasSize(1);
         assertThat(result.get(0).getProviderId()).isEqualTo("master");
     }
-
-    // ===== countOtherEnabled =====
 
     @Test
     @DisplayName("countOtherEnabled: ENABLEDが0件の場合、除外指定があっても0を返す")

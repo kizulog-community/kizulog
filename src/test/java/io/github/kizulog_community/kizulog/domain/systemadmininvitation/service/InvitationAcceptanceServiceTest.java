@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import java.time.OffsetDateTime;
@@ -29,6 +30,9 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountRoleStatusRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountStatusRepository;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.exception.AccountLocalizationError;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.exception.AccountLocalizationException;
+import io.github.kizulog_community.kizulog.domain.systemaccountlocalization.service.AccountLocalizationApplicationService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationException;
 
@@ -46,6 +50,7 @@ class InvitationAcceptanceServiceTest {
     private SystemAccountRoleRepository roleRepository;
     private SystemAccountRoleStatusRepository roleStatusRepository;
     private SystemAdminInvitationService invitationService;
+    private AccountLocalizationApplicationService accountLocalizationApplicationService;
     private InvitationAcceptanceService service;
 
     @BeforeEach
@@ -57,6 +62,8 @@ class InvitationAcceptanceServiceTest {
         roleRepository = mock(SystemAccountRoleRepository.class);
         roleStatusRepository = mock(SystemAccountRoleStatusRepository.class);
         invitationService = mock(SystemAdminInvitationService.class);
+        accountLocalizationApplicationService =
+                mock(AccountLocalizationApplicationService.class);
 
         service = new InvitationAcceptanceService(
                 accountRepository,
@@ -65,12 +72,13 @@ class InvitationAcceptanceServiceTest {
                 identityStatusRepository,
                 roleRepository,
                 roleStatusRepository,
-                invitationService);
+                invitationService,
+                accountLocalizationApplicationService);
     }
 
     @Test
-    @DisplayName("acceptInvitation: 正常系 - account/status/identity/identityStatus/role/roleStatus + markAsUsedが順次呼ばれる")
-    void acceptInvitation_savesAllSixEntitiesAndMarksAsUsed() {
+    @DisplayName("acceptInvitation: 正常系 - account/status/identity/identityStatus/role/roleStatus + localization + markAsUsedが順次呼ばれる")
+    void acceptInvitation_savesAllEntitiesIncludingLocalizationAndMarksAsUsed() {
         OffsetDateTime before = OffsetDateTime.now(ZoneOffset.UTC);
 
         SystemAccountIdentity result = service.acceptInvitation(
@@ -127,6 +135,11 @@ class InvitationAcceptanceServiceTest {
                 ArgumentCaptor.forClass(SystemAccountRoleStatus.class);
         verify(roleStatusRepository).save(roleStatusCap.capture());
         assertThat(roleStatusCap.getValue().getStatus()).isEqualTo(AccountStatus.ACTIVE);
+
+        // K.5: localization作成も呼ばれる
+        verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(
+                        result.getAccountId(), "system:invite:inv-001");
 
         verify(invitationService).markAsUsed("inv-001", "system:invite:inv-001");
 
@@ -215,7 +228,7 @@ class InvitationAcceptanceServiceTest {
     }
 
     @Test
-    @DisplayName("acceptInvitation: 同一トランザクション内で順序通り呼ばれる(account→status→identity→identityStatus→role→roleStatus→markAsUsed)")
+    @DisplayName("acceptInvitation: 同一トランザクション内で順序通り呼ばれる(account→status→identity→identityStatus→role→roleStatus→localization→markAsUsed)")
     void acceptInvitation_callsRepositoriesInOrder() {
         service.acceptInvitation("inv-006", "iss", "aud", "sub");
 
@@ -223,6 +236,7 @@ class InvitationAcceptanceServiceTest {
                 accountRepository, accountStatusRepository,
                 identityRepository, identityStatusRepository,
                 roleRepository, roleStatusRepository,
+                accountLocalizationApplicationService,
                 invitationService);
         inOrder.verify(accountRepository).save(Mockito.any());
         inOrder.verify(accountStatusRepository).save(Mockito.any());
@@ -230,6 +244,8 @@ class InvitationAcceptanceServiceTest {
         inOrder.verify(identityStatusRepository).save(Mockito.any());
         inOrder.verify(roleRepository).save(Mockito.any());
         inOrder.verify(roleStatusRepository).save(Mockito.any());
+        inOrder.verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(Mockito.anyString(), Mockito.anyString());
         inOrder.verify(invitationService).markAsUsed(Mockito.anyString(), Mockito.anyString());
     }
 
@@ -244,13 +260,15 @@ class InvitationAcceptanceServiceTest {
                 .extracting(e -> ((InvitationException) e).getError())
                 .isEqualTo(InvitationError.INVITATION_NOT_FOUND);
 
-        // 例外伝播前に6種の保存は呼ばれている(トランザクション境界はSpringがロールバックする想定)
+        // 例外伝播前に6種の保存とlocalization作成は呼ばれている(トランザクション境界はSpringがロールバックする想定)
         verify(accountRepository).save(Mockito.any());
         verify(accountStatusRepository).save(Mockito.any());
         verify(identityRepository).save(Mockito.any());
         verify(identityStatusRepository).save(Mockito.any());
         verify(roleRepository).save(Mockito.any());
         verify(roleStatusRepository).save(Mockito.any());
+        verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(Mockito.anyString(), Mockito.anyString());
     }
 
     @Test
@@ -271,11 +289,14 @@ class InvitationAcceptanceServiceTest {
         roleRepository = mock(SystemAccountRoleRepository.class);
         roleStatusRepository = mock(SystemAccountRoleStatusRepository.class);
         invitationService = mock(SystemAdminInvitationService.class);
+        accountLocalizationApplicationService =
+                mock(AccountLocalizationApplicationService.class);
         service = new InvitationAcceptanceService(
                 accountRepository, accountStatusRepository,
                 identityRepository, identityStatusRepository,
                 roleRepository, roleStatusRepository,
-                invitationService);
+                invitationService,
+                accountLocalizationApplicationService);
 
         SystemAccountIdentity second =
                 service.acceptInvitation("inv-B", "iss", "aud", "sub-b");
@@ -296,6 +317,81 @@ class InvitationAcceptanceServiceTest {
         assertThat(accountStatusCap.getValue().getCreatedBy()).isEqualTo("system:invite:inv-008");
 
         verify(invitationService).markAsUsed("inv-008", "system:invite:inv-008");
+    }
+
+    @Test
+    @DisplayName("acceptInvitation(K.5): localization作成にaccountIdとcreatedByが正しく渡される")
+    void acceptInvitation_localizationCreatedWithCorrectAccountIdAndCreatedBy() {
+        SystemAccountIdentity result = service.acceptInvitation(
+                "inv-009", "iss", "aud", "sub");
+
+        ArgumentCaptor<String> accountIdCap = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> createdByCap = ArgumentCaptor.forClass(String.class);
+        verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(
+                        accountIdCap.capture(), createdByCap.capture());
+
+        // accountId は新規発行されたものと一致する
+        assertThat(accountIdCap.getValue()).isEqualTo(result.getAccountId());
+        // createdBy は他のエンティティと同じプレフィックス付き
+        assertThat(createdByCap.getValue()).isEqualTo("system:invite:inv-009");
+    }
+
+    @Test
+    @DisplayName("acceptInvitation(K.5): localization作成は markAsUsed の前に呼ばれる")
+    void acceptInvitation_localizationCalledBeforeMarkAsUsed() {
+        service.acceptInvitation("inv-010", "iss", "aud", "sub");
+
+        var inOrder = Mockito.inOrder(
+                accountLocalizationApplicationService, invitationService);
+        inOrder.verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(Mockito.anyString(), Mockito.anyString());
+        inOrder.verify(invitationService).markAsUsed(Mockito.anyString(), Mockito.anyString());
+    }
+
+    @Test
+    @DisplayName("acceptInvitation(K.5): localization作成が SYSTEM_LOCALIZATION_NOT_CONFIGURED で失敗した場合、例外伝播 / markAsUsed は呼ばれない")
+    void acceptInvitation_propagatesException_whenLocalizationFails() {
+        doThrow(new AccountLocalizationException(
+                AccountLocalizationError.SYSTEM_LOCALIZATION_NOT_CONFIGURED))
+                .when(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(
+                        Mockito.anyString(), Mockito.anyString());
+
+        assertThatThrownBy(() -> service.acceptInvitation("inv-011", "iss", "aud", "sub"))
+                .isInstanceOf(AccountLocalizationException.class)
+                .extracting(e -> ((AccountLocalizationException) e).getError())
+                .isEqualTo(AccountLocalizationError.SYSTEM_LOCALIZATION_NOT_CONFIGURED);
+
+        // localization作成までは順次呼ばれている
+        verify(accountRepository).save(Mockito.any());
+        verify(accountStatusRepository).save(Mockito.any());
+        verify(identityRepository).save(Mockito.any());
+        verify(identityStatusRepository).save(Mockito.any());
+        verify(roleRepository).save(Mockito.any());
+        verify(roleStatusRepository).save(Mockito.any());
+        verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(Mockito.anyString(), Mockito.anyString());
+
+        // markAsUsedは呼ばれていない（招待は再利用可能）
+        verify(invitationService, never()).markAsUsed(Mockito.anyString(), Mockito.anyString());
+    }
+
+    @Test
+    @DisplayName("acceptInvitation(K.5): localization作成で渡されるaccountIdは保存済みaccountと同じ")
+    void acceptInvitation_localizationAccountIdMatchesPersistedAccount() {
+        service.acceptInvitation("inv-012", "iss", "aud", "sub");
+
+        ArgumentCaptor<SystemAccount> accountCap = ArgumentCaptor.forClass(SystemAccount.class);
+        verify(accountRepository).save(accountCap.capture());
+        String persistedAccountId = accountCap.getValue().getAccountId();
+
+        ArgumentCaptor<String> localizationAccountIdCap = ArgumentCaptor.forClass(String.class);
+        verify(accountLocalizationApplicationService)
+                .createDefaultLocalizationForAccount(
+                        localizationAccountIdCap.capture(), Mockito.anyString());
+
+        assertThat(localizationAccountIdCap.getValue()).isEqualTo(persistedAccountId);
     }
 
 }

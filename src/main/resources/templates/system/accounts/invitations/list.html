@@ -83,13 +83,13 @@
                                       th:text="#{system.invitations.status.CANCELLED}">取消済</span>
                             </td>
                             <td>
-                                <span th:text="${#temporals.format(item.createdAt, 'yyyy-MM-dd HH:mm')}">
-                                    2026-05-14 09:00
+                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.createdAt)}">
+                                    2026-05-14 18:00
                                 </span>
                             </td>
                             <td>
-                                <span th:text="${#temporals.format(item.expiresAt, 'yyyy-MM-dd HH:mm')}">
-                                    2026-05-15 09:00
+                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.expiresAt)}">
+                                    2026-05-15 18:00
                                 </span>
                             </td>
                             <td class="text-end">

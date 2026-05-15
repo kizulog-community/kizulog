@@ -72,8 +72,8 @@
                     <div class="mt-3 small text-muted">
                         <i class="bi bi-clock me-1"></i>
                         <span th:text="#{system.invitations.detail.issued.expiresLabel}">有効期限:</span>
-                        <span th:text="${#temporals.format(issuedView.expiresAt, 'yyyy-MM-dd HH:mm')}">
-                            2026-05-15 09:00
+                        <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(issuedView.expiresAt)}">
+                            2026-05-15 18:00
                         </span>
                     </div>
                 </div>
@@ -109,14 +109,14 @@
 
                         <dt class="col-sm-3" th:text="#{system.invitations.detail.field.expiresAt}">有効期限</dt>
                         <dd class="col-sm-9"
-                            th:text="${#temporals.format(invitation.expiresAt, 'yyyy-MM-dd HH:mm:ss')}">
-                            2026-05-15 09:00:00
+                            th:text="${@dateTimeFormatHelper.formatDateTime(invitation.expiresAt)}">
+                            2026-05-15 18:00:00
                         </dd>
 
                         <dt class="col-sm-3" th:text="#{system.invitations.detail.field.createdAt}">作成日時</dt>
                         <dd class="col-sm-9"
-                            th:text="${#temporals.format(invitation.createdAt, 'yyyy-MM-dd HH:mm:ss')}">
-                            2026-05-14 09:00:00
+                            th:text="${@dateTimeFormatHelper.formatDateTime(invitation.createdAt)}">
+                            2026-05-14 18:00:00
                         </dd>
 
                         <dt class="col-sm-3" th:text="#{system.invitations.detail.field.createdBy}">作成者</dt>
@@ -130,8 +130,8 @@
                         <dt class="col-sm-3" th:if="${invitation.statusUpdatedAt != null}"
                             th:text="#{system.invitations.detail.field.statusUpdatedAt}">ステータス更新</dt>
                         <dd class="col-sm-9" th:if="${invitation.statusUpdatedAt != null}">
-                            <span th:text="${#temporals.format(invitation.statusUpdatedAt, 'yyyy-MM-dd HH:mm:ss')}">
-                                2026-05-14 09:30:00
+                            <span th:text="${@dateTimeFormatHelper.formatDateTime(invitation.statusUpdatedAt)}">
+                                2026-05-14 18:30:00
                             </span>
                             <span th:if="${invitation.statusUpdatedBy != null}" class="text-muted small ms-2"
                                   th:text="'(' + ${invitation.statusUpdatedBy} + ')'">(updater)</span>

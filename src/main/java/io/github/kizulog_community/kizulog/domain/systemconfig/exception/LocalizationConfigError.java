@@ -25,6 +25,12 @@ public enum LocalizationConfigError {
     /** デフォルトタイムゾーンが利用可能タイムゾーンリストに含まれていない */
     DEFAULT_TIMEZONE_NOT_IN_AVAILABLE,
 
+    /** 削除しようとしている言語がACTIVEなアカウントで使用中 */
+    LANGUAGE_IN_USE_BY_ACCOUNT,
+
+    /** 削除しようとしているタイムゾーンがACTIVEなアカウントで使用中 */
+    TIMEZONE_IN_USE_BY_ACCOUNT,
+
     /** JSONシリアライズ失敗（バグ起因の異常系） */
     SERIALIZATION_FAILED,
 

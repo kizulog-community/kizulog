@@ -173,8 +173,8 @@
                             <dt class="col-sm-3"
                                 th:text="#{system.localization.field.languageVersion}">言語設定 更新日時</dt>
                             <dd class="col-sm-9"
-                                th:text="${#temporals.format(localization.languageVersion, 'yyyy-MM-dd HH:mm:ss z')}">
-                                2026-05-04 02:30:15 UTC
+                                th:text="${@dateTimeFormatHelper.format(localization.languageVersion)}">
+                                2026-05-04 11:30:15 JST (Asia/Tokyo)
                             </dd>
 
                             <dt class="col-sm-3"
@@ -200,8 +200,8 @@
                             <dt class="col-sm-3"
                                 th:text="#{system.localization.field.timezoneVersion}">タイムゾーン設定 更新日時</dt>
                             <dd class="col-sm-9"
-                                th:text="${#temporals.format(localization.timezoneVersion, 'yyyy-MM-dd HH:mm:ss z')}">
-                                2026-05-04 02:30:15 UTC
+                                th:text="${@dateTimeFormatHelper.format(localization.timezoneVersion)}">
+                                2026-05-04 11:30:15 JST (Asia/Tokyo)
                             </dd>
 
                             <dt class="col-sm-3"

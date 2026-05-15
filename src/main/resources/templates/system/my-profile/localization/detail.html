@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.my-profile.localization.detail.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='my-profile')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/my-profile}"
+                               th:text="#{system.my-profile.title}">プロフィール設定</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.my-profile.localization.detail.breadcrumb}">
+                            言語・タイムゾーン
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル + アクションボタン -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-translate me-2"></i>
+                        <span th:text="#{system.my-profile.localization.detail.title}">
+                            言語・タイムゾーン設定
+                        </span>
+                    </h1>
+                    <a class="btn btn-primary"
+                       th:href="@{/system/my-profile/localization/edit}">
+                        <i class="bi bi-pencil me-1"></i>
+                        <span th:text="#{system.my-profile.localization.detail.button.edit}">編集</span>
+                    </a>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}" class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- 現在の設定                                                    -->
+                <!-- ============================================================ -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-gear me-2"></i>
+                            <span th:text="#{system.my-profile.localization.detail.section.current}">
+                                現在の設定
+                            </span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.my-profile.localization.field.language}">言語</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-primary"
+                                      th:text="${localization.language.displayName}">日本語</span>
+                                <code class="text-muted ms-2 small"
+                                      th:text="${localization.language.code}">ja</code>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.my-profile.localization.field.timezone}">タイムゾーン</dt>
+                            <dd class="col-sm-9">
+                                <span class="badge bg-primary"
+                                      th:text="${localization.timezone.displayName}">
+                                    Asia/Tokyo (UTC+09:00)
+                                </span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- 監査情報                                                      -->
+                <!-- ============================================================ -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span th:text="#{system.my-profile.localization.detail.section.audit}">監査情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.my-profile.localization.field.version}">更新日時</dt>
+                            <dd class="col-sm-9"
+                                th:text="${@dateTimeFormatHelper.format(localization.version)}">
+                                2026-05-15 22:00:15 JST (Asia/Tokyo)
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.my-profile.localization.field.createdBy}">更新者</dt>
+                            <dd class="col-sm-9"
+                                th:text="${localization.createdBy}">system:invite:inv-001</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- 戻るリンク -->
+                <div class="mb-4">
+                    <a th:href="@{/system/my-profile}"
+                       class="btn btn-link text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.my-profile.localization.detail.button.back}">プロフィール設定に戻る</span>
+                    </a>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

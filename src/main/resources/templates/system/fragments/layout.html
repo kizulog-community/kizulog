@@ -61,6 +61,11 @@
         .system-sidebar .nav-link i {
             margin-right: 0.5rem;
         }
+        /* サイドバー内のセクション区切り */
+        .system-sidebar .sidebar-divider {
+            border-top: 1px solid #dee2e6;
+            margin: 0.5rem 0;
+        }
 
         /* メインコンテンツエリア */
         .system-content {
@@ -131,6 +136,16 @@
            th:classappend="${activeMenu == 'accounts'} ? 'active' : ''">
             <i class="bi bi-people"></i>
             <span th:text="#{system.menu.accounts}">アカウント管理</span>
+        </a>
+
+        <!-- 個人設定セクション区切り -->
+        <div class="sidebar-divider"></div>
+
+        <a class="nav-link"
+           th:href="@{/system/my-profile}"
+           th:classappend="${activeMenu == 'my-profile'} ? 'active' : ''">
+            <i class="bi bi-person-gear"></i>
+            <span th:text="#{system.menu.myProfile}">プロフィール設定</span>
         </a>
     </nav>
 </aside>
