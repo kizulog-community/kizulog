@@ -1,5 +1,6 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
@@ -38,15 +39,22 @@ public class SystemAccountStatusRepositoryImpl implements SystemAccountStatusRep
      * {@inheritDoc}
      */
     @Override
+    public List<SystemAccountStatus> findAllByAccountIdOrderByVersionDesc(String accountId) {
+        return jpaRepository.findAllByAccountIdOrderByVersionDesc(accountId).stream()
+                .map(this::toDomain)
+                .toList();
+    }
+
+    /**
+     * {@inheritDoc}
+     */
+    @Override
     public void save(SystemAccountStatus systemAccountStatus) {
         jpaRepository.save(toEntity(systemAccountStatus));
     }
 
     /**
      * Entityをドメインモデルにマップする。
-     *
-     * @param entity Entity
-     * @return ドメインモデル
      */
     private SystemAccountStatus toDomain(SystemAccountStatusEntity entity) {
         return new SystemAccountStatus(
@@ -61,9 +69,6 @@ public class SystemAccountStatusRepositoryImpl implements SystemAccountStatusRep
 
     /**
      * ドメインモデルをEntityにマップする。
-     *
-     * @param systemAccountStatus ドメインモデル
-     * @return Entity
      */
     private SystemAccountStatusEntity toEntity(SystemAccountStatus systemAccountStatus) {
         return new SystemAccountStatusEntity(

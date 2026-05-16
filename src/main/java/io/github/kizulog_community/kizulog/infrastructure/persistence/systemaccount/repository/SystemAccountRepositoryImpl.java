@@ -1,5 +1,6 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
@@ -25,6 +26,13 @@ public class SystemAccountRepositoryImpl implements SystemAccountRepository {
     public Optional<SystemAccount> findLatestByAccountId(String accountId) {
         return jpaRepository.findLatestByAccountId(accountId)
                 .map(this::toDomain);
+    }
+
+    @Override
+    public List<SystemAccount> findAllLatest() {
+        return jpaRepository.findAllLatest().stream()
+                .map(this::toDomain)
+                .toList();
     }
 
     @Override

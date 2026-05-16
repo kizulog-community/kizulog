@@ -1,5 +1,6 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,6 +27,17 @@ public interface SystemAccountStatusJpaRepository
             )
             """)
     Optional<SystemAccountStatusEntity> findLatestByAccountId(
+            @Param("accountId") String accountId);
+
+    /**
+     * 指定accountIdのステータス履歴を全件version降順で取得する。
+     */
+    @Query("""
+            SELECT s FROM SystemAccountStatusEntity s
+            WHERE s.id.accountId = :accountId
+            ORDER BY s.id.version DESC
+            """)
+    List<SystemAccountStatusEntity> findAllByAccountIdOrderByVersionDesc(
             @Param("accountId") String accountId);
 
 }

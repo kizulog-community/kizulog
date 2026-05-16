@@ -1,5 +1,6 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemaccount.repository;
 
+import java.util.List;
 import java.util.Optional;
 
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -31,5 +32,17 @@ public interface SystemAccountJpaRepository
             + ")")
     Optional<SystemAccountEntity> findLatestByAccountId(
             @Param("accountId") String accountId);
+
+    /**
+     * 全アカウントの最新バージョンを取得する。
+     *
+     * <p>各 account_id の最新 version のレコードを返す。</p>
+     */
+    @Query("SELECT e FROM SystemAccountEntity e "
+            + "WHERE e.id.version = ("
+            + "    SELECT MAX(e2.id.version) FROM SystemAccountEntity e2 "
+            + "    WHERE e2.id.accountId = e.id.accountId"
+            + ")")
+    List<SystemAccountEntity> findAllLatest();
 
 }

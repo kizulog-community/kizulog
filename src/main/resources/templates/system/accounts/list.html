@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.accounts.list.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='accounts')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/accounts}"
+                           th:text="#{system.menu.accounts}">アカウント管理</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.accounts.list.breadcrumb}">アカウント一覧</li>
+                </ol>
+            </nav>
+
+            <!-- ヘッダー -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-person-lines-fill me-2"></i>
+                    <span th:text="#{system.accounts.list.title}">アカウント一覧</span>
+                </h1>
+            </div>
+
+            <!-- 一覧外フラッシュメッセージ -->
+            <div th:if="${flashErrorKey}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{__${flashErrorKey}__}">エラー</span>
+            </div>
+
+            <!-- 説明 -->
+            <p class="text-muted small mb-3" th:text="#{system.accounts.list.description}">
+                登録済みシステム管理者アカウントの一覧です。
+            </p>
+
+            <!-- テーブル -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th th:text="#{system.accounts.list.column.accountId}">アカウントID</th>
+                            <th th:text="#{system.accounts.list.column.status}">ステータス</th>
+                            <th th:text="#{system.accounts.list.column.role}">ロール</th>
+                            <th th:text="#{system.accounts.list.column.identities}">identity数</th>
+                            <th th:text="#{system.accounts.list.column.createdAt}">作成日時</th>
+                            <th class="text-end" th:text="#{system.accounts.list.column.actions}">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${items}">
+                            <td>
+                                <span class="font-monospace small" th:text="${item.accountId}">acc-uuid</span>
+                                <span th:if="${item.self}" class="badge text-bg-info ms-2 small"
+                                      th:text="#{system.accounts.list.selfBadge}">自分</span>
+                            </td>
+                            <td>
+                                <span th:if="${item.currentStatus.name() == 'ACTIVE'}"
+                                      class="badge text-bg-success"
+                                      th:text="#{system.accounts.status.ACTIVE}">有効</span>
+                                <span th:if="${item.currentStatus.name() == 'INACTIVE'}"
+                                      class="badge text-bg-secondary"
+                                      th:text="#{system.accounts.status.INACTIVE}">無効</span>
+                                <span th:if="${item.currentStatus.name() == 'SUSPENDED'}"
+                                      class="badge text-bg-warning"
+                                      th:text="#{system.accounts.status.SUSPENDED}">一時停止</span>
+                            </td>
+                            <td>
+                                <span th:if="${item.systemAdminRoleActive}"
+                                      class="badge text-bg-primary"
+                                      th:text="#{system.accounts.list.role.systemAdminActive}">SYSTEM_ADMIN</span>
+                                <span th:if="${!item.systemAdminRoleActive}"
+                                      class="badge text-bg-light text-dark"
+                                      th:text="#{system.accounts.list.role.none}">なし</span>
+                            </td>
+                            <td>
+                                <span th:text="${item.activeIdentityCount}">1</span>
+                            </td>
+                            <td>
+                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.createdAt)}">
+                                    2026-05-14 18:00
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a th:href="@{'/system/accounts/' + ${item.accountId}}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                    <span th:text="#{system.accounts.list.action.detail}">詳細</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(items)}">
+                            <td colspan="6" class="text-center text-muted py-4"
+                                th:text="#{system.accounts.list.empty}">
+                                該当するアカウントはありません。
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+</body>
+</html>

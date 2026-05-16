@@ -68,10 +68,6 @@ class SystemAccountStatusRepositoryImplIT extends AbstractRepositoryIT {
         jpaRepository.save(entity);
     }
 
-    // ========================================================================
-    // findLatestByAccountId
-    // ========================================================================
-
     @Test
     @DisplayName("findLatestByAccountId: 同一accountIdで複数バージョンが存在する場合、最大versionのレコードを返す")
     void findLatestByAccountId_returnsLatestVersion_whenMultipleVersionsExist() {
@@ -152,9 +148,58 @@ class SystemAccountStatusRepositoryImplIT extends AbstractRepositoryIT {
         assertThat(result.get().getStatus()).isEqualTo(AccountStatus.INACTIVE);
     }
 
-    // ========================================================================
-    // save
-    // ========================================================================
+    @Test
+    @DisplayName("findAllByAccountIdOrderByVersionDesc: 指定accountIdの全履歴をversion降順で返す")
+    void findAllByAccountIdOrderByVersionDesc_returnsAllHistoryDesc() {
+        // given
+        OffsetDateTime v1 = BASE_TIME;
+        OffsetDateTime v2 = BASE_TIME.plusHours(1);
+        OffsetDateTime v3 = BASE_TIME.plusHours(2);
+        saveEntity("acc-1", v2, AccountStatus.SUSPENDED, "セキュリティ違反", "user:2");
+        saveEntity("acc-1", v1, AccountStatus.ACTIVE, null, "user:1");
+        saveEntity("acc-1", v3, AccountStatus.ACTIVE, "復帰", "user:3");
+
+        // when
+        List<SystemAccountStatus> result =
+                sut.findAllByAccountIdOrderByVersionDesc("acc-1");
+
+        // then
+        assertThat(result).hasSize(3);
+        assertThat(result.get(0).getVersion()).isEqualTo(v3);
+        assertThat(result.get(1).getVersion()).isEqualTo(v2);
+        assertThat(result.get(2).getVersion()).isEqualTo(v1);
+    }
+
+    @Test
+    @DisplayName("findAllByAccountIdOrderByVersionDesc: 該当なしは空リスト")
+    void findAllByAccountIdOrderByVersionDesc_returnsEmpty_whenNotFound() {
+        // given
+        saveEntity("acc-1", BASE_TIME, AccountStatus.ACTIVE, null, "user:1");
+
+        // when
+        List<SystemAccountStatus> result =
+                sut.findAllByAccountIdOrderByVersionDesc("acc-X");
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAllByAccountIdOrderByVersionDesc: 他accountIdのレコードを含まない")
+    void findAllByAccountIdOrderByVersionDesc_filtersByAccountId() {
+        // given
+        saveEntity("acc-1", BASE_TIME, AccountStatus.ACTIVE, null, "user:1");
+        saveEntity("acc-2", BASE_TIME.plusHours(1),
+                AccountStatus.INACTIVE, "test", "user:2");
+
+        // when
+        List<SystemAccountStatus> result =
+                sut.findAllByAccountIdOrderByVersionDesc("acc-1");
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAccountId()).isEqualTo("acc-1");
+    }
 
     @Test
     @DisplayName("save: 新規レコードを保存できる")

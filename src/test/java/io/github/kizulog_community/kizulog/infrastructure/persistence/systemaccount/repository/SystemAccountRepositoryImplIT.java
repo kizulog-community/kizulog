@@ -62,10 +62,6 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
         jpaRepository.save(entity);
     }
 
-    // ========================================================================
-    // findLatestByAccountId
-    // ========================================================================
-
     @Test
     @DisplayName("findLatestByAccountId: 同一accountIdで複数バージョンが存在する場合、最大versionのレコードを返す")
     void findLatestByAccountId_returnsLatestVersion_whenMultipleVersionsExist() {
@@ -141,9 +137,53 @@ class SystemAccountRepositoryImplIT extends AbstractRepositoryIT {
         assertThat(result.get().getVersion()).isEqualTo(BASE_TIME.plusHours(1));
     }
 
-    // ========================================================================
-    // save
-    // ========================================================================
+    @Test
+    @DisplayName("findAllLatest: 各accountIdの最新versionを返す")
+    void findAllLatest_returnsLatestVersionPerAccountId() {
+        // given
+        saveEntity("acc-1", BASE_TIME, "user:1");
+        saveEntity("acc-1", BASE_TIME.plusHours(1), "user:1");
+        saveEntity("acc-2", BASE_TIME.plusHours(2), "user:2");
+
+        // when
+        List<SystemAccount> result = sut.findAllLatest();
+
+        // then
+        assertThat(result).hasSize(2);
+        assertThat(result)
+                .anySatisfy(a -> {
+                    assertThat(a.getAccountId()).isEqualTo("acc-1");
+                    assertThat(a.getVersion()).isEqualTo(BASE_TIME.plusHours(1));
+                })
+                .anySatisfy(a -> {
+                    assertThat(a.getAccountId()).isEqualTo("acc-2");
+                    assertThat(a.getVersion()).isEqualTo(BASE_TIME.plusHours(2));
+                });
+    }
+
+    @Test
+    @DisplayName("findAllLatest: テーブルが空の場合、空リストを返す")
+    void findAllLatest_returnsEmptyList_whenTableIsEmpty() {
+        // when
+        List<SystemAccount> result = sut.findAllLatest();
+
+        // then
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    @DisplayName("findAllLatest: 単一accountIdが単一versionの場合、1件返す")
+    void findAllLatest_returnsSingleAccount() {
+        // given
+        saveEntity("acc-1", BASE_TIME, "system:setup");
+
+        // when
+        List<SystemAccount> result = sut.findAllLatest();
+
+        // then
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getAccountId()).isEqualTo("acc-1");
+    }
 
     @Test
     @DisplayName("save: 新規レコードを保存できる")

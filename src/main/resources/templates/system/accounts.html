@@ -14,6 +14,7 @@
 
             <main class="col-md-9 col-lg-10 system-content">
 
+                <!-- ページタイトル -->
                 <div class="d-flex justify-content-between align-items-center mb-4">
                     <h1 class="h3 mb-0">
                         <i class="bi bi-people me-2"></i>
@@ -21,25 +22,28 @@
                     </h1>
                 </div>
 
-                <p class="text-muted small mb-4" th:text="#{system.accounts.description}">
+                <p class="text-muted mb-4" th:text="#{system.accounts.description}">
                     システム管理者アカウントの管理を行います。
                 </p>
 
+                <!-- 機能カードリスト -->
                 <div class="row g-3">
-                    <!-- 招待管理カード(I.0で追加) -->
+
+                    <!-- 招待管理(I.0) -->
                     <div class="col-md-6 col-lg-4">
                         <a th:href="@{/system/accounts/invitations}"
-                           class="card text-decoration-none text-reset h-100 shadow-sm">
+                           class="card h-100 text-decoration-none text-body accounts-card">
                             <div class="card-body">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-envelope-paper text-primary me-2"
-                                       style="font-size: 1.5rem;"></i>
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="accounts-icon-wrapper bg-primary bg-opacity-10 text-primary me-3">
+                                        <i class="bi bi-envelope-paper"></i>
+                                    </div>
                                     <h5 class="card-title mb-0"
                                         th:text="#{system.accounts.feature.invitations.title}">
                                         招待管理
                                     </h5>
                                 </div>
-                                <p class="card-text small text-muted mb-0"
+                                <p class="card-text text-muted small mb-0"
                                    th:text="#{system.accounts.feature.invitations.description}">
                                     新規システム管理者の招待リンクを発行・管理します。
                                 </p>
@@ -47,33 +51,57 @@
                         </a>
                     </div>
 
-                    <!-- アカウント一覧カード(Coming Soon) -->
+                    <!-- アカウント一覧(N.0) -->
                     <div class="col-md-6 col-lg-4">
-                        <div class="card h-100 shadow-sm opacity-50">
+                        <a th:href="@{/system/accounts/list}"
+                           class="card h-100 text-decoration-none text-body accounts-card">
                             <div class="card-body">
-                                <div class="d-flex align-items-center mb-2">
-                                    <i class="bi bi-person-lines-fill text-secondary me-2"
-                                       style="font-size: 1.5rem;"></i>
+                                <div class="d-flex align-items-center mb-3">
+                                    <div class="accounts-icon-wrapper bg-info bg-opacity-10 text-info me-3">
+                                        <i class="bi bi-person-lines-fill"></i>
+                                    </div>
                                     <h5 class="card-title mb-0"
                                         th:text="#{system.accounts.feature.list.title}">
                                         アカウント一覧
                                     </h5>
-                                    <span class="badge text-bg-secondary ms-2 small"
-                                          th:text="#{system.common.comingSoon.badge}">Coming Soon</span>
                                 </div>
-                                <p class="card-text small text-muted mb-0"
+                                <p class="card-text text-muted small mb-0"
                                    th:text="#{system.accounts.feature.list.description}">
                                     登録済みシステム管理者の一覧を表示します。
                                 </p>
                             </div>
-                        </div>
+                        </a>
                     </div>
+
                 </div>
 
             </main>
 
         </div>
     </div>
+
+    <!-- ページ固有のスタイル（my-profile / system-settings と同じパターン） -->
+    <style>
+        .accounts-card {
+            border: 1px solid #dee2e6;
+            transition: all 0.2s ease;
+        }
+        .accounts-card:hover {
+            border-color: #0d6efd;
+            box-shadow: 0 0.25rem 0.5rem rgba(13, 110, 253, 0.1);
+            transform: translateY(-2px);
+        }
+        .accounts-icon-wrapper {
+            width: 48px;
+            height: 48px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+        }
+    </style>
 
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
 

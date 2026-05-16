@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.accounts.detail.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='accounts')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/accounts}"
+                           th:text="#{system.menu.accounts}">アカウント管理</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/accounts/list}"
+                           th:text="#{system.accounts.list.breadcrumb}">アカウント一覧</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.accounts.detail.breadcrumb}">詳細</li>
+                </ol>
+            </nav>
+
+            <!-- フラッシュメッセージ -->
+            <div th:if="${flashSuccessKey}" class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                <span th:text="#{__${flashSuccessKey}__}">成功</span>
+            </div>
+            <div th:if="${flashErrorMessage}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="${flashErrorMessage}">エラー</span>
+            </div>
+
+            <h1 class="h3 mb-3">
+                <i class="bi bi-person-circle me-2"></i>
+                <span th:text="#{system.accounts.detail.title}">アカウント詳細</span>
+            </h1>
+
+            <!-- 基本情報 -->
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <span th:text="#{system.accounts.detail.section.basic}">基本情報</span>
+                </div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.accountId}">アカウントID</dt>
+                        <dd class="col-sm-9 font-monospace small">
+                            <span th:text="${account.accountId}">acc-uuid</span>
+                            <span th:if="${account.self}" class="badge text-bg-info ms-2 small"
+                                  th:text="#{system.accounts.list.selfBadge}">自分</span>
+                        </dd>
+
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.currentStatus}">現在のステータス</dt>
+                        <dd class="col-sm-9">
+                            <span th:if="${account.currentStatus.name() == 'ACTIVE'}"
+                                  class="badge text-bg-success"
+                                  th:text="#{system.accounts.status.ACTIVE}">有効</span>
+                            <span th:if="${account.currentStatus.name() == 'INACTIVE'}"
+                                  class="badge text-bg-secondary"
+                                  th:text="#{system.accounts.status.INACTIVE}">無効</span>
+                            <span th:if="${account.currentStatus.name() == 'SUSPENDED'}"
+                                  class="badge text-bg-warning"
+                                  th:text="#{system.accounts.status.SUSPENDED}">一時停止</span>
+                        </dd>
+
+                        <dt class="col-sm-3" th:if="${account.currentStatusReason != null}"
+                            th:text="#{system.accounts.detail.field.currentStatusReason}">現在ステータスの理由</dt>
+                        <dd class="col-sm-9" th:if="${account.currentStatusReason != null}"
+                            th:text="${account.currentStatusReason}">理由</dd>
+
+                        <dt class="col-sm-3" th:if="${account.currentStatusVersion != null}"
+                            th:text="#{system.accounts.detail.field.currentStatusUpdatedAt}">最終更新日時</dt>
+                        <dd class="col-sm-9" th:if="${account.currentStatusVersion != null}">
+                            <span th:text="${@dateTimeFormatHelper.formatDateTime(account.currentStatusVersion)}">
+                                2026-05-14 18:30:00
+                            </span>
+                            <span th:if="${account.currentStatusUpdatedBy != null}" class="text-muted small ms-2"
+                                  th:text="'(' + ${account.currentStatusUpdatedBy} + ')'">(updater)</span>
+                        </dd>
+
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.role}">ロール</dt>
+                        <dd class="col-sm-9">
+                            <span th:if="${account.systemAdminRoleActive}"
+                                  class="badge text-bg-primary"
+                                  th:text="#{system.accounts.list.role.systemAdminActive}">SYSTEM_ADMIN</span>
+                            <span th:if="${!account.systemAdminRoleActive}"
+                                  class="badge text-bg-light text-dark"
+                                  th:text="#{system.accounts.list.role.none}">なし</span>
+                        </dd>
+
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.identities}">identity数</dt>
+                        <dd class="col-sm-9">
+                            <span th:text="#{system.accounts.detail.identities.summary(${account.activeIdentityCount}, ${account.totalIdentityCount})}">
+                                ACTIVE 1件 / 合計 1件
+                            </span>
+                        </dd>
+
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.accountCreatedAt}">アカウント作成日時</dt>
+                        <dd class="col-sm-9"
+                            th:text="${@dateTimeFormatHelper.formatDateTime(account.accountCreatedAt)}">
+                            2026-05-14 18:00:00
+                        </dd>
+
+                        <dt class="col-sm-3" th:text="#{system.accounts.detail.field.accountCreatedBy}">作成者</dt>
+                        <dd class="col-sm-9 font-monospace small" th:text="${account.accountCreatedBy}">creator</dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- ステータス変更操作 -->
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <span th:text="#{system.accounts.detail.section.statusChange}">ステータス変更</span>
+                </div>
+                <div class="card-body">
+                    <!-- 自分自身のアカウント: 操作不可 -->
+                    <div th:if="${account.self}" class="alert alert-info mb-0" role="alert">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <span th:text="#{system.accounts.detail.statusChange.selfDisabled}">
+                            自分自身のステータスは変更できません。
+                        </span>
+                    </div>
+
+                    <!-- 自分以外: 3ボタンを現状ステータスに応じて表示・非表示 -->
+                    <div th:if="${!account.self}" class="d-flex gap-2">
+                        <!-- 有効化 (ACTIVE以外で表示) -->
+                        <button th:if="${account.currentStatus.name() != 'ACTIVE'}"
+                                type="button"
+                                class="btn btn-success"
+                                data-bs-toggle="modal"
+                                data-bs-target="#statusChangeModal"
+                                data-target-status="ACTIVE">
+                            <i class="bi bi-check-circle me-1"></i>
+                            <span th:text="#{system.accounts.detail.button.activate}">有効化</span>
+                        </button>
+
+                        <!-- 一時停止 (SUSPENDED以外で表示) -->
+                        <button th:if="${account.currentStatus.name() != 'SUSPENDED'}"
+                                type="button"
+                                class="btn btn-warning"
+                                data-bs-toggle="modal"
+                                data-bs-target="#statusChangeModal"
+                                data-target-status="SUSPENDED">
+                            <i class="bi bi-pause-circle me-1"></i>
+                            <span th:text="#{system.accounts.detail.button.suspend}">一時停止</span>
+                        </button>
+
+                        <!-- 無効化 (INACTIVE以外で表示) -->
+                        <button th:if="${account.currentStatus.name() != 'INACTIVE'}"
+                                type="button"
+                                class="btn btn-danger"
+                                data-bs-toggle="modal"
+                                data-bs-target="#statusChangeModal"
+                                data-target-status="INACTIVE">
+                            <i class="bi bi-x-circle me-1"></i>
+                            <span th:text="#{system.accounts.detail.button.deactivate}">無効化</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ステータス履歴 -->
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <span th:text="#{system.accounts.detail.section.history}">ステータス履歴</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-sm mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th th:text="#{system.accounts.detail.history.column.changedAt}">変更日時</th>
+                            <th th:text="#{system.accounts.detail.history.column.status}">ステータス</th>
+                            <th th:text="#{system.accounts.detail.history.column.reason}">理由</th>
+                            <th th:text="#{system.accounts.detail.history.column.changedBy}">変更者</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="entry : ${account.statusHistory}">
+                            <td>
+                                <span th:text="${@dateTimeFormatHelper.formatDateTime(entry.createdAt)}">
+                                    2026-05-14 18:30:00
+                                </span>
+                            </td>
+                            <td>
+                                <span th:if="${entry.status.name() == 'ACTIVE'}"
+                                      class="badge text-bg-success"
+                                      th:text="#{system.accounts.status.ACTIVE}">有効</span>
+                                <span th:if="${entry.status.name() == 'INACTIVE'}"
+                                      class="badge text-bg-secondary"
+                                      th:text="#{system.accounts.status.INACTIVE}">無効</span>
+                                <span th:if="${entry.status.name() == 'SUSPENDED'}"
+                                      class="badge text-bg-warning"
+                                      th:text="#{system.accounts.status.SUSPENDED}">一時停止</span>
+                            </td>
+                            <td>
+                                <span th:if="${entry.reason != null}" th:text="${entry.reason}">理由</span>
+                                <span th:if="${entry.reason == null}" class="text-muted small">—</span>
+                            </td>
+                            <td class="font-monospace small" th:text="${entry.createdBy}">creator</td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(account.statusHistory)}">
+                            <td colspan="4" class="text-center text-muted py-3"
+                                th:text="#{system.accounts.detail.history.empty}">
+                                履歴はまだありません。
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 戻る -->
+            <div class="d-flex justify-content-between">
+                <a th:href="@{/system/accounts/list}"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    <span th:text="#{system.accounts.detail.button.back}">一覧に戻る</span>
+                </a>
+            </div>
+
+            <!-- ステータス変更モーダル（自分以外のみ表示） -->
+            <div th:if="${!account.self}"
+                 class="modal fade" id="statusChangeModal" tabindex="-1"
+                 aria-labelledby="statusChangeModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form th:action="@{'/system/accounts/' + ${account.accountId} + '/status'}"
+                          th:object="${statusChangeForm}"
+                          method="post"
+                          class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="statusChangeModalLabel"
+                                th:text="#{system.accounts.detail.statusChange.modal.title}">
+                                ステータス変更の確認
+                            </h5>
+                            <button type="button" class="btn-close"
+                                    data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p th:text="#{system.accounts.detail.statusChange.modal.confirm}">
+                                以下のアカウントのステータスを変更します。よろしいですか?
+                            </p>
+                            <p class="text-muted small font-monospace">
+                                <strong th:text="${account.accountId}">accountId</strong>
+                            </p>
+
+                            <!-- 目標ステータス（hidden） -->
+                            <input type="hidden" th:field="*{targetStatus}" id="targetStatusField" />
+
+                            <!-- 目標ステータス表示 -->
+                            <div class="mb-3">
+                                <label class="form-label small"
+                                       th:text="#{system.accounts.detail.statusChange.modal.targetStatusLabel}">
+                                    変更先ステータス
+                                </label>
+                                <div>
+                                    <span id="targetStatusDisplay" class="badge text-bg-secondary"
+                                          th:text="#{system.accounts.detail.statusChange.modal.unspecified}">未指定</span>
+                                </div>
+                                <div class="invalid-feedback d-block"
+                                     th:if="${#fields.hasErrors('targetStatus')}"
+                                     th:errors="*{targetStatus}">エラー</div>
+                            </div>
+
+                            <div class="mb-3">
+                                <label for="reasonField" class="form-label small"
+                                       th:text="#{system.accounts.detail.statusChange.modal.reasonLabel}">
+                                    変更理由（必須）
+                                </label>
+                                <textarea id="reasonField"
+                                          th:field="*{reason}"
+                                          class="form-control"
+                                          th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid' : ''"
+                                          rows="3"
+                                          maxlength="1000"
+                                          required></textarea>
+                                <div class="invalid-feedback"
+                                     th:if="${#fields.hasErrors('reason')}"
+                                     th:errors="*{reason}">エラー</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    data-bs-dismiss="modal"
+                                    th:text="#{system.accounts.detail.statusChange.modal.dismiss}">
+                                キャンセル
+                            </button>
+                            <button type="submit" class="btn btn-primary"
+                                    th:text="#{system.accounts.detail.statusChange.modal.submit}">
+                                変更を実行
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+
+<!-- モーダル: 開いたボタンの data-target-status を hidden に投入 + 表示更新 -->
+<script th:if="${!account.self}">
+(function() {
+    var modalEl = document.getElementById('statusChangeModal');
+    if (!modalEl) {
+        return;
+    }
+    var hidden = document.getElementById('targetStatusField');
+    var display = document.getElementById('targetStatusDisplay');
+    var labels = {
+        ACTIVE:    /*[[#{system.accounts.status.ACTIVE}]]*/ 'ACTIVE',
+        INACTIVE:  /*[[#{system.accounts.status.INACTIVE}]]*/ 'INACTIVE',
+        SUSPENDED: /*[[#{system.accounts.status.SUSPENDED}]]*/ 'SUSPENDED'
+    };
+    var badgeClasses = {
+        ACTIVE:    'badge text-bg-success',
+        INACTIVE:  'badge text-bg-secondary',
+        SUSPENDED: 'badge text-bg-warning'
+    };
+    modalEl.addEventListener('show.bs.modal', function(event) {
+        var trigger = event.relatedTarget;
+        if (!trigger) {
+            return;
+        }
+        var target = trigger.getAttribute('data-target-status');
+        if (target && hidden) {
+            hidden.value = target;
+        }
+        if (target && display) {
+            display.textContent = labels[target] || target;
+            display.className = badgeClasses[target] || 'badge text-bg-secondary';
+        }
+    });
+})();
+</script>
+
+<!-- バリデーションエラー時にモーダルを再オープン -->
+<script th:if="${openModal == 'statusChange'}">
+(function() {
+    var modalEl = document.getElementById('statusChangeModal');
+    if (modalEl) {
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+})();
+</script>
+
+</body>
+</html>
