@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.new.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants}"
+                               th:text="#{system.tenants.list.breadcrumb}">テナント管理</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.tenants.new.breadcrumb}">新規登録</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-plus-square me-2"></i>
+                        <span th:text="#{system.tenants.new.title}">テナント新規登録</span>
+                    </h1>
+                </div>
+
+                <p class="text-muted mb-4" th:text="#{system.tenants.new.description}">
+                    新しいテナントを登録します。テナント名と、アクセスを許可する1つ以上のホスト名を入力してください。
+                </p>
+
+                <!-- エラーフラッシュ -->
+                <div th:if="${flashErrorMessage}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- フォーム -->
+                <form id="tenantRegistrationForm"
+                      th:action="@{/system/tenants}"
+                      th:object="${registrationForm}"
+                      method="post"
+                      novalidate>
+
+                    <!-- グローバルエラー -->
+                    <div th:if="${#fields.hasGlobalErrors()}"
+                         class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <ul class="mb-0">
+                            <li th:each="err : ${#fields.globalErrors()}"
+                                th:text="${err}">エラー</li>
+                        </ul>
+                    </div>
+
+                    <!-- 基本情報 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong th:text="#{system.tenants.new.section.basic}">基本情報</strong>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- テナント名 -->
+                            <div class="mb-3">
+                                <label for="name" class="form-label">
+                                    <span th:text="#{system.tenants.field.name}">テナント名</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="name"
+                                       th:field="*{name}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       th:placeholder="#{system.tenants.field.name.placeholder}"
+                                       autocomplete="off"
+                                       maxlength="100" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{name}">エラー</div>
+                                <div class="form-text"
+                                     th:text="#{system.tenants.field.name.help}">
+                                    1〜100文字。日本語可。
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- ホスト設定 -->
+                    <div class="card mb-3">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <strong th:text="#{system.tenants.new.section.hosts}">アクセス可能なホスト</strong>
+                            <button type="button" id="addHostBtn"
+                                    class="btn btn-sm btn-outline-primary">
+                                <i class="bi bi-plus-lg me-1"></i>
+                                <span th:text="#{system.tenants.new.button.addHost}">行を追加</span>
+                            </button>
+                        </div>
+                        <div class="card-body">
+
+                            <p class="text-muted small mb-3"
+                               th:text="#{system.tenants.new.hosts.description}">
+                                テナントへのアクセスを許可するホスト名を1つ以上入力してください。<br/>
+                                例: time.example.jp（プロトコル、ポート番号、パスは含めない）
+                            </p>
+
+                            <div id="hostListContainer">
+                                <!-- 初期表示: 1行（既存入力があればそれを反映） -->
+                                <div th:if="${#lists.isEmpty(registrationForm.hosts)}"
+                                     class="host-row mb-2 d-flex gap-2">
+                                    <input type="text"
+                                           name="hosts[0]"
+                                           class="form-control"
+                                           th:placeholder="#{system.tenants.field.host.placeholder}"
+                                           autocomplete="off"
+                                           maxlength="253" />
+                                    <button type="button"
+                                            class="btn btn-outline-danger remove-host-btn"
+                                            disabled>
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                                <div th:each="host, iter : ${registrationForm.hosts}"
+                                     class="host-row mb-2 d-flex gap-2">
+                                    <input type="text"
+                                           th:name="'hosts[' + ${iter.index} + ']'"
+                                           th:value="${host}"
+                                           class="form-control"
+                                           th:placeholder="#{system.tenants.field.host.placeholder}"
+                                           autocomplete="off"
+                                           maxlength="253" />
+                                    <button type="button"
+                                            class="btn btn-outline-danger remove-host-btn"
+                                            th:disabled="${#lists.size(registrationForm.hosts) == 1}">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div class="form-text mt-2"
+                                 th:text="#{system.tenants.field.host.help}">
+                                RFC1123準拠ホスト名。小文字英数字とハイフンのみ。
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- 変更理由 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong th:text="#{system.tenants.field.reason}">登録理由</strong>
+                            <span class="text-danger">*</span>
+                        </div>
+                        <div class="card-body">
+                            <textarea id="reason"
+                                      th:field="*{reason}"
+                                      th:errorclass="is-invalid"
+                                      class="form-control"
+                                      rows="3"
+                                      th:placeholder="#{system.tenants.field.reason.placeholder}"
+                                      maxlength="1000"></textarea>
+                            <div class="invalid-feedback"
+                                 th:errors="*{reason}">エラー</div>
+                            <div class="form-text"
+                                 th:text="#{system.tenants.field.reason.help}">
+                                1〜1000文字。監査ログに記録されます。
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-between">
+                        <a th:href="@{/system/tenants}"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>
+                            <span th:text="#{system.tenants.new.button.cancel}">キャンセル</span>
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            <span th:text="#{system.tenants.new.button.register}">登録する</span>
+                        </button>
+                    </div>
+
+                </form>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        document.addEventListener('DOMContentLoaded', function () {
+            const container = document.getElementById('hostListContainer');
+            const addBtn = document.getElementById('addHostBtn');
+            const hostPlaceholder = /*[[#{system.tenants.field.host.placeholder}]]*/ '';
+
+            function updateIndexAndRemoveState() {
+                const rows = container.querySelectorAll('.host-row');
+                rows.forEach((row, idx) => {
+                    const input = row.querySelector('input[type="text"]');
+                    input.name = 'hosts[' + idx + ']';
+                });
+                const removeBtns = container.querySelectorAll('.remove-host-btn');
+                removeBtns.forEach(btn => {
+                    btn.disabled = rows.length <= 1;
+                });
+            }
+
+            addBtn.addEventListener('click', function () {
+                const newRow = document.createElement('div');
+                newRow.className = 'host-row mb-2 d-flex gap-2';
+                newRow.innerHTML =
+                    '<input type="text" class="form-control" placeholder="'
+                    + hostPlaceholder + '" autocomplete="off" maxlength="253" />'
+                    + '<button type="button" class="btn btn-outline-danger remove-host-btn">'
+                    + '<i class="bi bi-trash"></i></button>';
+                container.appendChild(newRow);
+                bindRemoveButton(newRow.querySelector('.remove-host-btn'));
+                updateIndexAndRemoveState();
+            });
+
+            function bindRemoveButton(btn) {
+                btn.addEventListener('click', function () {
+                    btn.closest('.host-row').remove();
+                    updateIndexAndRemoveState();
+                });
+            }
+
+            container.querySelectorAll('.remove-host-btn').forEach(bindRemoveButton);
+            updateIndexAndRemoveState();
+        });
+        /*]]>*/
+    </script>
+
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.edit.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants}"
+                               th:text="#{system.tenants.list.breadcrumb}">テナント管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                               th:text="${tenant.name}">テナント名</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.tenants.edit.breadcrumb}">編集</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-pencil-square me-2"></i>
+                        <span th:text="#{system.tenants.edit.title}">テナント編集</span>
+                    </h1>
+                </div>
+
+                <p class="text-muted mb-4" th:text="#{system.tenants.edit.description}">
+                    テナント名のみ編集できます。tenant_id、slug は変更できません。host の管理は詳細画面から行います。
+                </p>
+
+                <!-- エラーフラッシュ -->
+                <div th:if="${flashErrorMessage}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- 変更不可項目 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <strong th:text="#{system.tenants.edit.section.readonly}">変更不可項目</strong>
+                    </div>
+                    <div class="card-body">
+
+                        <!-- テナントID -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <span th:text="#{system.tenants.field.tenantId}">テナントID</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control"
+                                   th:value="${tenant.tenantId}"
+                                   readonly
+                                   disabled />
+                            <div class="form-text"
+                                 th:text="#{system.tenants.field.tenantId.help}">
+                                作成時に自動採番されるUUID。変更できません。
+                            </div>
+                        </div>
+
+                        <!-- slug -->
+                        <div class="mb-3">
+                            <label class="form-label">
+                                <span th:text="#{system.tenants.field.slug}">slug</span>
+                            </label>
+                            <input type="text"
+                                   class="form-control font-monospace"
+                                   th:value="${tenant.slug}"
+                                   readonly
+                                   disabled />
+                            <div class="form-text"
+                                 th:text="#{system.tenants.field.slug.help}">
+                                URLパスのテナント識別子。変更できません。
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+
+                <!-- フォーム -->
+                <form id="tenantEditForm"
+                      th:action="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                      th:object="${editForm}"
+                      method="post"
+                      novalidate>
+
+                    <!-- グローバルエラー -->
+                    <div th:if="${#fields.hasGlobalErrors()}"
+                         class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <ul class="mb-0">
+                            <li th:each="err : ${#fields.globalErrors()}"
+                                th:text="${err}">エラー</li>
+                        </ul>
+                    </div>
+
+                    <!-- 編集可能項目 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong th:text="#{system.tenants.edit.section.editable}">編集項目</strong>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- テナント名 -->
+                            <div class="mb-3">
+                                <label for="name" class="form-label">
+                                    <span th:text="#{system.tenants.field.name}">テナント名</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="name"
+                                       th:field="*{name}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       autocomplete="off"
+                                       maxlength="100" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{name}">エラー</div>
+                                <div class="form-text"
+                                     th:text="#{system.tenants.field.name.help}">
+                                    1〜100文字。日本語可。
+                                </div>
+                            </div>
+
+                            <!-- 変更理由 -->
+                            <div class="mb-3">
+                                <label for="reason" class="form-label">
+                                    <span th:text="#{system.tenants.field.reason}">変更理由</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <textarea id="reason"
+                                          th:field="*{reason}"
+                                          th:errorclass="is-invalid"
+                                          class="form-control"
+                                          rows="3"
+                                          th:placeholder="#{system.tenants.field.reason.placeholder}"
+                                          maxlength="1000"></textarea>
+                                <div class="invalid-feedback"
+                                     th:errors="*{reason}">エラー</div>
+                                <div class="form-text"
+                                     th:text="#{system.tenants.field.reason.help}">
+                                    1〜1000文字。監査ログに記録されます。
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-between">
+                        <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                           class="btn btn-outline-secondary">
+                            <i class="bi bi-x-lg me-1"></i>
+                            <span th:text="#{system.tenants.edit.button.cancel}">キャンセル</span>
+                        </a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-lg me-1"></i>
+                            <span th:text="#{system.tenants.edit.button.save}">保存する</span>
+                        </button>
+                    </div>
+
+                </form>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

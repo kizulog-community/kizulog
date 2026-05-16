@@ -31,7 +31,7 @@ CREATE TABLE system_accounts (
 CREATE TABLE system_account_status (
     account_id   TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE / SUSPENDED
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE system_account_roles (
     role_id      TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
     account_id   TEXT        NOT NULL,
-    role         TEXT        NOT NULL, -- SYSTEM_ADMIN
+    role         TEXT        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
     CONSTRAINT system_account_roles_pk PRIMARY KEY (role_id, version)
@@ -123,12 +123,12 @@ CREATE INDEX system_account_role_status_idx_02
 -- system_oidc_providers（システムOIDCプロバイダー設定）
 -- ============================================================
 CREATE TABLE system_oidc_providers (
-    provider_id    TEXT        NOT NULL, -- 'master', 'google', 'azure-ad' 等（自由入力, [a-z0-9-]+, 1-32文字）
+    provider_id    TEXT        NOT NULL,
     version        TIMESTAMPTZ NOT NULL,
-    display_name   TEXT        NOT NULL, -- 管理画面での表示名（例: "Keycloak Master Realm"）
-    uri            TEXT        NOT NULL, -- OIDC Issuer URI
+    display_name   TEXT        NOT NULL,
+    uri            TEXT        NOT NULL,
     client_id      TEXT        NOT NULL,
-    client_secret  TEXT        NOT NULL, -- AES暗号化済み
+    client_secret  TEXT        NOT NULL,
     created_at     TIMESTAMPTZ NOT NULL,
     created_by     TEXT        NOT NULL,
     CONSTRAINT system_oidc_providers_pk PRIMARY KEY (provider_id, version)
@@ -160,14 +160,14 @@ CREATE TABLE tenants (
     tenant_id    TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
     name         TEXT        NOT NULL,
-    host         TEXT        NOT NULL,
+    slug         TEXT        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
     CONSTRAINT tenants_pk PRIMARY KEY (tenant_id, version)
 );
 
 CREATE INDEX tenants_idx_01
-    ON tenants (host, version DESC);
+    ON tenants (slug, version DESC);
 
 -- ============================================================
 -- tenant_status（業務テナントステータス）
@@ -187,6 +187,44 @@ CREATE INDEX tenant_status_idx_01
 
 CREATE INDEX tenant_status_idx_02
     ON tenant_status (status, version DESC);
+
+-- ============================================================
+-- tenant_hosts（業務テナント識別ホスト）
+-- ============================================================
+CREATE TABLE tenant_hosts (
+    tenant_id    TEXT        NOT NULL,
+    host         TEXT        NOT NULL,
+    version      TIMESTAMPTZ NOT NULL,
+    created_at   TIMESTAMPTZ NOT NULL,
+    created_by   TEXT        NOT NULL,
+    CONSTRAINT tenant_hosts_pk PRIMARY KEY (tenant_id, host, version)
+);
+
+CREATE INDEX tenant_hosts_idx_01
+    ON tenant_hosts (host, version DESC);
+
+CREATE INDEX tenant_hosts_idx_02
+    ON tenant_hosts (tenant_id, version DESC);
+
+-- ============================================================
+-- tenant_host_status（業務テナント識別ホストステータス）
+-- ============================================================
+CREATE TABLE tenant_host_status (
+    tenant_id    TEXT        NOT NULL,
+    host         TEXT        NOT NULL,
+    version      TIMESTAMPTZ NOT NULL,
+    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    reason       TEXT,
+    created_at   TIMESTAMPTZ NOT NULL,
+    created_by   TEXT        NOT NULL,
+    CONSTRAINT tenant_host_status_pk PRIMARY KEY (tenant_id, host, version)
+);
+
+CREATE INDEX tenant_host_status_idx_01
+    ON tenant_host_status (tenant_id, host, version DESC);
+
+CREATE INDEX tenant_host_status_idx_02
+    ON tenant_host_status (status, version DESC);
 
 -- ============================================================
 -- tenant_oidc_configs（業務テナントOIDC設定）
@@ -411,3 +449,4 @@ CREATE INDEX system_account_localization_idx_02
 
 CREATE INDEX system_account_localization_idx_03
     ON system_account_localization (timezone_id, version DESC);
+    
