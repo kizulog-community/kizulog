@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.oidc.list.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants}"
+                               th:text="#{system.tenants.list.breadcrumb}">テナント管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                               th:text="${tenant.name}">テナント名</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.tenants.oidc.list.breadcrumb}">
+                            OIDCプロバイダー
+                        </li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-shield-lock me-2"></i>
+                        <span th:text="#{system.tenants.oidc.list.title}">OIDCプロバイダー</span>
+                    </h1>
+                    <a class="btn btn-primary"
+                       th:href="@{/system/tenants/{tid}/oidc-providers/new(tid=${tenant.tenantId})}">
+                        <i class="bi bi-plus-lg me-1"></i>
+                        <span th:text="#{system.tenants.oidc.list.button.add}">新規追加</span>
+                    </a>
+                </div>
+
+                <!-- 対象テナント表示 -->
+                <div class="card mb-3">
+                    <div class="card-body py-2 d-flex justify-content-between align-items-center">
+                        <div>
+                            <span class="text-muted small me-2"
+                                  th:text="#{system.tenants.oidc.list.targetTenant}">対象テナント:</span>
+                            <strong th:text="${tenant.name}">テナント名</strong>
+                            <code class="ms-2 small text-muted"
+                                  th:text="${tenant.slug}">slug</code>
+                        </div>
+                        <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                           class="btn btn-sm btn-outline-secondary">
+                            <i class="bi bi-arrow-left me-1"></i>
+                            <span th:text="#{system.tenants.oidc.list.button.backToTenant}">テナント詳細へ</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}"
+                     class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ（キー） -->
+                <div th:if="${flashErrorKey}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="#{__${flashErrorKey}__}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ（メッセージ） -->
+                <div th:if="${flashErrorMessage}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- 一覧テーブル -->
+                <div class="card">
+                    <div class="card-body p-0">
+
+                        <!-- 0件 -->
+                        <div th:if="${#lists.isEmpty(items)}" class="text-center py-5">
+                            <i class="bi bi-inbox text-secondary"
+                               style="font-size: 3rem;"></i>
+                            <p class="mt-3 text-muted mb-0"
+                               th:text="#{system.tenants.oidc.list.empty}">
+                                該当するプロバイダーはありません。
+                            </p>
+                        </div>
+
+                        <!-- 1件以上 -->
+                        <table th:if="${not #lists.isEmpty(items)}"
+                               class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th th:text="#{system.tenants.oidc.list.column.providerId}">プロバイダーID</th>
+                                    <th th:text="#{system.tenants.oidc.list.column.displayName}">表示名</th>
+                                    <th th:text="#{system.tenants.oidc.list.column.iss}">Issuer URI</th>
+                                    <th th:text="#{system.tenants.oidc.list.column.status}">ステータス</th>
+                                    <th class="text-end"
+                                        th:text="#{system.tenants.oidc.list.column.actions}">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="item : ${items}">
+                                    <td>
+                                        <code th:text="${item.providerId}">master</code>
+                                    </td>
+                                    <td th:text="${item.displayName}">プロバイダー表示名</td>
+                                    <td>
+                                        <code class="small text-muted"
+                                              th:text="${item.iss}">https://example.com</code>
+                                    </td>
+                                    <td>
+                                        <span th:if="${item.currentStatus.name() == 'ENABLED'}"
+                                              class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.status.ENABLED}">有効</span>
+                                        </span>
+                                        <span th:if="${item.currentStatus.name() == 'DISABLED'}"
+                                              class="badge bg-secondary">
+                                            <i class="bi bi-pause-circle me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.status.DISABLED}">無効</span>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-primary"
+                                           th:href="@{/system/tenants/{tid}/oidc-providers/{pid}(tid=${tenant.tenantId}, pid=${item.providerId})}">
+                                            <i class="bi bi-eye me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.list.action.detail}">詳細</span>
+                                        </a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+</body>
+</html>

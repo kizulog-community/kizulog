@@ -48,6 +48,7 @@ import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantHostStatusChangeForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantRegistrationForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantStatusChangeForm;
+import jakarta.servlet.http.HttpServletRequest;
 
 /**
  * SystemTenantsControllerの単体テスト
@@ -80,6 +81,16 @@ class SystemTenantsControllerTest {
                 .issuer(ISS).subject(SUB).audience(List.of(AUD)).build();
         return SystemUserPrincipal.ofSystemAdmin(
                 OPERATOR_ID, IDENTITY_ID, ISS, AUD, SUB, idToken);
+    }
+
+    /**
+     * HttpServletRequest のモックを生成する。
+     * 既定では scheme=https を返す。
+     */
+    private HttpServletRequest mockRequest() {
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getScheme()).thenReturn("https");
+        return req;
     }
 
     private TenantListItemView listItem(String tenantId) {
@@ -194,7 +205,7 @@ class SystemTenantsControllerTest {
 
         Model model = new ConcurrentModel();
         RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
-        String view = sut.detail("t1", model, redirectAttrs);
+        String view = sut.detail("t1", mockRequest(), model, redirectAttrs);
 
         assertThat(view).isEqualTo("system/tenants/detail");
         assertThat(model.getAttribute("activeMenu")).isEqualTo("tenants");
@@ -208,13 +219,45 @@ class SystemTenantsControllerTest {
     }
 
     @Test
+    @DisplayName("detail: ログインURL生成用のscheme(loginUrlScheme)がmodelにセットされる")
+    void detail_setsLoginUrlScheme() {
+        TenantDetailView v = detailView("t1");
+        when(service.findTenantDetail("t1")).thenReturn(Optional.of(v));
+
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getScheme()).thenReturn("https");
+
+        Model model = new ConcurrentModel();
+        RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
+        sut.detail("t1", req, model, redirectAttrs);
+
+        assertThat(model.getAttribute("loginUrlScheme")).isEqualTo("https");
+    }
+
+    @Test
+    @DisplayName("detail: scheme=httpの場合もそのままmodelにセットされる")
+    void detail_setsLoginUrlScheme_http() {
+        TenantDetailView v = detailView("t1");
+        when(service.findTenantDetail("t1")).thenReturn(Optional.of(v));
+
+        HttpServletRequest req = mock(HttpServletRequest.class);
+        when(req.getScheme()).thenReturn("http");
+
+        Model model = new ConcurrentModel();
+        RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
+        sut.detail("t1", req, model, redirectAttrs);
+
+        assertThat(model.getAttribute("loginUrlScheme")).isEqualTo("http");
+    }
+
+    @Test
     @DisplayName("detail: 存在しないtenantIdは一覧へリダイレクトしフラッシュにエラーキー設定")
     void detail_notFound_redirects() {
         when(service.findTenantDetail("missing")).thenReturn(Optional.empty());
 
         Model model = new ConcurrentModel();
         RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
-        String view = sut.detail("missing", model, redirectAttrs);
+        String view = sut.detail("missing", mockRequest(), model, redirectAttrs);
 
         assertThat(view).isEqualTo("redirect:/system/tenants");
         assertThat(redirectAttrs.getFlashAttributes().get("flashErrorKey"))

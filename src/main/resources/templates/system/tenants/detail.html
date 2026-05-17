@@ -228,7 +228,8 @@
                                 </tr>
                             </thead>
                             <tbody>
-                                <tr th:each="host : ${tenant.hosts}">
+                                <tr th:each="host : ${tenant.hosts}"
+                                    th:with="loginUrl=${loginUrlScheme + '://' + host.host + '/t/' + tenant.slug + '/login'}">
                                     <td>
                                         <code th:text="${host.host}">example.com</code>
                                     </td>
@@ -249,6 +250,20 @@
                                         2026-05-16 00:00
                                     </td>
                                     <td class="text-end">
+                                        <!-- ログインURLコピーボタン（tooltipでURLをホバー表示） -->
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-secondary copy-url-btn"
+                                                th:data-url="${loginUrl}"
+                                                th:data-label-default="#{system.tenants.detail.hosts.button.copyUrl}"
+                                                th:data-label-copied="#{system.tenants.detail.hosts.button.copyUrl.copied}"
+                                                th:data-label-failed="#{system.tenants.detail.hosts.button.copyUrl.failed}"
+                                                data-bs-toggle="tooltip"
+                                                data-bs-placement="top"
+                                                th:data-bs-title="${loginUrl}">
+                                            <i class="bi bi-clipboard me-1"></i>
+                                            <span class="copy-url-label"
+                                                  th:text="#{system.tenants.detail.hosts.button.copyUrl}">URLをコピー</span>
+                                        </button>
                                         <!-- ACTIVE → INACTIVE (無効化) -->
                                         <button type="button"
                                                 th:if="${host.currentStatus.name() == 'ACTIVE'}"
@@ -724,6 +739,82 @@
                 display.textContent = HOST_STATUS_LABELS[target] || target;
                 display.className = HOST_STATUS_BADGE[target] || 'badge text-bg-secondary';
             }
+        });
+    })();
+    </script>
+
+    <!-- Bootstrap Tooltip 初期化 -->
+    <script>
+    (function () {
+        const tooltipTriggers = document.querySelectorAll('[data-bs-toggle="tooltip"]');
+        tooltipTriggers.forEach(function (el) {
+            new bootstrap.Tooltip(el);
+        });
+    })();
+    </script>
+
+    <!-- ログインURL コピーボタン -->
+    <script>
+    (function () {
+        const FEEDBACK_DURATION_MS = 2000;
+
+        /**
+         * クリップボードへの書き込み。
+         * navigator.clipboard を優先し、利用不可な場合は document.execCommand へフォールバック。
+         */
+        function copyToClipboard(text) {
+            if (navigator.clipboard && window.isSecureContext) {
+                return navigator.clipboard.writeText(text);
+            }
+            // フォールバック: textarea + execCommand
+            return new Promise(function (resolve, reject) {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed';
+                ta.style.left = '-9999px';
+                ta.setAttribute('readonly', '');
+                document.body.appendChild(ta);
+                ta.select();
+                try {
+                    const ok = document.execCommand('copy');
+                    document.body.removeChild(ta);
+                    if (ok) {
+                        resolve();
+                    } else {
+                        reject(new Error('execCommand returned false'));
+                    }
+                } catch (err) {
+                    document.body.removeChild(ta);
+                    reject(err);
+                }
+            });
+        }
+
+        function showTemporaryLabel(btn, labelEl, text, durationMs) {
+            const defaultLabel = btn.getAttribute('data-label-default');
+            labelEl.textContent = text;
+            btn.disabled = true;
+            setTimeout(function () {
+                labelEl.textContent = defaultLabel;
+                btn.disabled = false;
+            }, durationMs);
+        }
+
+        document.querySelectorAll('.copy-url-btn').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                const url = btn.getAttribute('data-url');
+                const labelEl = btn.querySelector('.copy-url-label');
+                if (!url || !labelEl) return;
+
+                copyToClipboard(url).then(function () {
+                    const text = btn.getAttribute('data-label-copied');
+                    showTemporaryLabel(btn, labelEl, text, FEEDBACK_DURATION_MS);
+                }).catch(function (err) {
+                    console.error('Failed to copy URL:', err);
+                    const text = btn.getAttribute('data-label-failed');
+                    showTemporaryLabel(btn, labelEl, text, FEEDBACK_DURATION_MS);
+                });
+            });
         });
     })();
     </script>

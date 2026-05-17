@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.oidc.new.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants}"
+                               th:text="#{system.tenants.list.breadcrumb}">テナント管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                               th:text="${tenant.name}">テナント名</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{tid}/oidc-providers(tid=${tenant.tenantId})}"
+                               th:text="#{system.tenants.oidc.list.breadcrumb}">OIDCプロバイダー</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="#{system.tenants.oidc.new.breadcrumb}">新規追加</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-plus-square me-2"></i>
+                        <span th:text="#{system.tenants.oidc.new.title}">
+                            OIDCプロバイダー新規追加
+                        </span>
+                    </h1>
+                </div>
+
+                <p class="text-muted mb-4"
+                   th:text="#{system.tenants.oidc.new.description}">
+                    新しい OIDC プロバイダーを登録します。すべての項目を入力し、接続確認に成功してから保存してください。
+                </p>
+
+                <!-- エラーフラッシュ（メッセージ） -->
+                <div th:if="${flashErrorMessage}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- フォーム -->
+                <form id="oidcProviderForm"
+                      th:action="@{/system/tenants/{tid}/oidc-providers(tid=${tenant.tenantId})}"
+                      th:object="${registrationForm}"
+                      method="post"
+                      novalidate>
+
+                    <!-- グローバルエラー -->
+                    <div th:if="${#fields.hasGlobalErrors()}"
+                         class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle me-2"></i>
+                        <ul class="mb-0">
+                            <li th:each="err : ${#fields.globalErrors()}"
+                                th:text="${err}">エラー</li>
+                        </ul>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong th:text="#{system.tenants.oidc.new.section.basic}">基本情報</strong>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- プロバイダーID -->
+                            <div class="mb-3">
+                                <label for="providerId" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.providerId}">プロバイダーID</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="providerId"
+                                       th:field="*{providerId}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       placeholder="google, azure-ad など"
+                                       autocomplete="off"
+                                       maxlength="32" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{providerId}">エラー</div>
+                                <small class="form-text text-muted"
+                                       th:text="#{system.tenants.oidc.field.providerId.help}">
+                                    半角英数小文字とハイフンのみ、1〜32文字。後から変更できません。
+                                </small>
+                            </div>
+
+                            <!-- 表示名 -->
+                            <div class="mb-3">
+                                <label for="displayName" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.displayName}">表示名</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="displayName"
+                                       th:field="*{displayName}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       placeholder="Google Workspace など"
+                                       maxlength="100" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{displayName}">エラー</div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <strong th:text="#{system.tenants.oidc.new.section.oidc}">OIDC接続情報</strong>
+                        </div>
+                        <div class="card-body">
+
+                            <!-- Issuer URI -->
+                            <div class="mb-3">
+                                <label for="iss" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.iss}">Issuer URI</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="url"
+                                       id="iss"
+                                       th:field="*{iss}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       placeholder="https://example.com/realms/master"
+                                       maxlength="500" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{iss}">エラー</div>
+                                <small class="form-text text-muted"
+                                       th:text="#{system.tenants.oidc.field.iss.help}">
+                                    OIDC プロバイダーの Issuer URI（後から変更できません）。
+                                </small>
+                            </div>
+
+                            <!-- Audience -->
+                            <div class="mb-3">
+                                <label for="aud" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.aud}">Audience</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="aud"
+                                       th:field="*{aud}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       autocomplete="off"
+                                       maxlength="255" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{aud}">エラー</div>
+                                <small class="form-text text-muted"
+                                       th:text="#{system.tenants.oidc.field.aud.help}">
+                                    通常は Client ID と同じ値（後から変更できません）。
+                                </small>
+                            </div>
+
+                            <!-- Client ID -->
+                            <div class="mb-3">
+                                <label for="clientId" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.clientId}">Client ID</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="text"
+                                       id="clientId"
+                                       th:field="*{clientId}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       autocomplete="off"
+                                       maxlength="255" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{clientId}">エラー</div>
+                            </div>
+
+                            <!-- Client Secret -->
+                            <div class="mb-3">
+                                <label for="clientSecret" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.clientSecret}">Client Secret</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <input type="password"
+                                       id="clientSecret"
+                                       th:field="*{clientSecret}"
+                                       th:errorclass="is-invalid"
+                                       class="form-control"
+                                       autocomplete="new-password"
+                                       maxlength="500" />
+                                <div class="invalid-feedback"
+                                     th:errors="*{clientSecret}">エラー</div>
+                            </div>
+
+                        </div>
+                    </div>
+
+                    <!-- 接続確認エリア -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="mb-3">
+                                <i class="bi bi-plug me-2"></i>
+                                <span th:text="#{system.oidcProviders.form.connection.title}">接続確認</span>
+                            </h6>
+                            <p class="text-muted small mb-3"
+                               th:text="#{system.tenants.oidc.new.connection.description}">
+                                Issuer URI への接続を確認してから保存できます。
+                            </p>
+
+                            <button type="button"
+                                    id="testConnectionBtn"
+                                    class="btn btn-outline-primary mb-3">
+                                <span class="spinner-border spinner-border-sm me-1 d-none"
+                                      id="testConnectionSpinner"
+                                      role="status"></span>
+                                <i class="bi bi-check-circle me-1"
+                                   id="testConnectionIcon"></i>
+                                <span th:text="#{system.oidcProviders.form.connection.button}">接続確認</span>
+                            </button>
+
+                            <!-- 結果表示エリア -->
+                            <div id="testConnectionResult" class="d-none">
+                                <!-- 動的に挿入される -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 登録理由 -->
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <label for="reason" class="form-label">
+                                    <span th:text="#{system.tenants.oidc.field.reason}">登録理由</span>
+                                    <span class="text-danger">*</span>
+                                </label>
+                                <textarea id="reason"
+                                          th:field="*{reason}"
+                                          th:errorclass="is-invalid"
+                                          class="form-control"
+                                          rows="3"
+                                          maxlength="1000"></textarea>
+                                <div class="invalid-feedback"
+                                     th:errors="*{reason}">エラー</div>
+                                <small class="form-text text-muted"
+                                       th:text="#{system.tenants.oidc.field.reason.help}">
+                                    1〜1000文字。監査ログに記録されます。
+                                </small>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 操作ボタン -->
+                    <div class="d-flex justify-content-between">
+                        <a th:href="@{/system/tenants/{tid}/oidc-providers(tid=${tenant.tenantId})}"
+                           class="btn btn-link text-decoration-none">
+                            <i class="bi bi-arrow-left me-1"></i>
+                            <span th:text="#{system.tenants.oidc.new.button.cancel}">キャンセル</span>
+                        </a>
+                        <button type="submit"
+                                id="submitBtn"
+                                class="btn btn-primary"
+                                disabled>
+                            <i class="bi bi-save me-1"></i>
+                            <span th:text="#{system.tenants.oidc.new.button.register}">登録する</span>
+                        </button>
+                    </div>
+
+                </form>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <!-- 接続確認用スクリプト -->
+    <script th:inline="javascript">
+        (function () {
+            'use strict';
+
+            const csrfToken = document.querySelector('meta[name="_csrf"]')?.getAttribute('content');
+            const csrfHeader = document.querySelector('meta[name="_csrf_header"]')?.getAttribute('content');
+            const tenantId = /*[[${tenant.tenantId}]]*/ '';
+
+            const i18n = {
+                inProgress: /*[[#{system.oidcProviders.form.connection.inProgress}]]*/ '接続確認中...',
+                success: /*[[#{system.oidcProviders.form.connection.success}]]*/ '接続成功',
+                resultStale: /*[[#{system.oidcProviders.form.connection.stale}]]*/ '入力内容が変更されたため、再度接続確認を実施してください。'
+            };
+
+            const testBtn = document.getElementById('testConnectionBtn');
+            const testIcon = document.getElementById('testConnectionIcon');
+            const testSpinner = document.getElementById('testConnectionSpinner');
+            const resultArea = document.getElementById('testConnectionResult');
+            const submitBtn = document.getElementById('submitBtn');
+            const inputs = ['providerId', 'displayName', 'iss', 'aud', 'clientId', 'clientSecret']
+                    .map(id => document.getElementById(id));
+
+            // 入力変更時: 接続確認結果をクリア + 保存ボタン無効化
+            inputs.forEach(input => {
+                if (!input) return;
+                input.addEventListener('input', () => {
+                    if (!resultArea.classList.contains('d-none')) {
+                        resultArea.classList.remove('d-none');
+                        resultArea.innerHTML =
+                            '<div class="alert alert-warning mb-0">' +
+                            '<i class="bi bi-exclamation-circle me-2"></i>' +
+                            i18n.resultStale +
+                            '</div>';
+                    }
+                    submitBtn.disabled = true;
+                });
+            });
+
+            testBtn.addEventListener('click', async function () {
+                const iss = document.getElementById('iss').value.trim();
+                if (!iss) {
+                    return;
+                }
+
+                // 状態リセット
+                testBtn.disabled = true;
+                testIcon.classList.add('d-none');
+                testSpinner.classList.remove('d-none');
+                resultArea.classList.remove('d-none');
+                resultArea.innerHTML =
+                    '<div class="alert alert-info mb-0">' +
+                    '<i class="bi bi-hourglass-split me-2"></i>' +
+                    i18n.inProgress +
+                    '</div>';
+
+                try {
+                    const headers = { 'Content-Type': 'application/json' };
+                    if (csrfToken && csrfHeader) {
+                        headers[csrfHeader] = csrfToken;
+                    }
+
+                    const url = '/system/tenants/' + encodeURIComponent(tenantId)
+                              + '/oidc-providers/test-connection';
+                    const res = await fetch(url, {
+                        method: 'POST',
+                        headers: headers,
+                        body: JSON.stringify({ iss: iss })
+                    });
+
+                    const data = await res.json();
+
+                    if (data.success) {
+                        resultArea.innerHTML =
+                            '<div class="alert alert-success mb-0">' +
+                            '<i class="bi bi-check-circle-fill me-2"></i>' +
+                            i18n.success +
+                            '</div>';
+                        submitBtn.disabled = false;
+                    } else {
+                        const escapedMessage = (data.errorMessage || '')
+                            .replace(/&/g, '&amp;')
+                            .replace(/</g, '&lt;')
+                            .replace(/>/g, '&gt;');
+                        resultArea.innerHTML =
+                            '<div class="alert alert-danger mb-0">' +
+                            '<i class="bi bi-x-circle-fill me-2"></i>' +
+                            escapedMessage +
+                            '</div>';
+                        submitBtn.disabled = true;
+                    }
+                } catch (e) {
+                    resultArea.innerHTML =
+                        '<div class="alert alert-danger mb-0">' +
+                        '<i class="bi bi-x-circle-fill me-2"></i>' +
+                        e.message +
+                        '</div>';
+                    submitBtn.disabled = true;
+                } finally {
+                    testBtn.disabled = false;
+                    testIcon.classList.remove('d-none');
+                    testSpinner.classList.add('d-none');
+                }
+            });
+        })();
+    </script>
+
+</body>
+</html>

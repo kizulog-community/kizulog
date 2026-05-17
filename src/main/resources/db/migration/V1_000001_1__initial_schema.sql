@@ -71,7 +71,7 @@ CREATE INDEX system_account_identities_idx_02
 CREATE TABLE system_account_identity_status (
     identity_id  TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -106,7 +106,7 @@ CREATE INDEX system_account_roles_idx_01
 CREATE TABLE system_account_role_status (
     role_id      TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -140,7 +140,7 @@ CREATE TABLE system_oidc_providers (
 CREATE TABLE system_oidc_provider_status (
     provider_id    TEXT        NOT NULL,
     version        TIMESTAMPTZ NOT NULL,
-    status         TEXT        NOT NULL, -- ENABLED / DISABLED
+    status         TEXT        NOT NULL,
     reason         TEXT,
     created_at     TIMESTAMPTZ NOT NULL,
     created_by     TEXT        NOT NULL,
@@ -166,7 +166,7 @@ CREATE TABLE tenants (
     CONSTRAINT tenants_pk PRIMARY KEY (tenant_id, version)
 );
 
-CREATE INDEX tenants_idx_01
+CREATE UNIQUE INDEX tenants_idx_01
     ON tenants (slug, version DESC);
 
 -- ============================================================
@@ -175,7 +175,7 @@ CREATE INDEX tenants_idx_01
 CREATE TABLE tenant_status (
     tenant_id    TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE / SUSPENDED
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -201,19 +201,19 @@ CREATE TABLE tenant_hosts (
 );
 
 CREATE INDEX tenant_hosts_idx_01
-    ON tenant_hosts (host, version DESC);
+    ON tenant_hosts (tenant_id, host, version DESC);
 
 CREATE INDEX tenant_hosts_idx_02
-    ON tenant_hosts (tenant_id, version DESC);
+    ON tenant_hosts (host, version DESC);
 
 -- ============================================================
--- tenant_host_status（業務テナント識別ホストステータス）
+-- tenant_host_status（業務テナント識別ホスト ステータス）
 -- ============================================================
 CREATE TABLE tenant_host_status (
     tenant_id    TEXT        NOT NULL,
     host         TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -227,41 +227,49 @@ CREATE INDEX tenant_host_status_idx_02
     ON tenant_host_status (status, version DESC);
 
 -- ============================================================
--- tenant_oidc_configs（業務テナントOIDC設定）
+-- tenant_oidc_providers（業務テナントOIDCプロバイダー設定）
 -- ============================================================
-CREATE TABLE tenant_oidc_configs (
-    tenant_id    TEXT        NOT NULL,
-    iss          TEXT        NOT NULL,
-    aud          TEXT        NOT NULL,
-    version      TIMESTAMPTZ NOT NULL,
-    created_at   TIMESTAMPTZ NOT NULL,
-    created_by   TEXT        NOT NULL,
-    CONSTRAINT tenant_oidc_configs_pk PRIMARY KEY (tenant_id, iss, aud, version)
+CREATE TABLE tenant_oidc_providers (
+    tenant_id      TEXT        NOT NULL,
+    provider_id    TEXT        NOT NULL,
+    version        TIMESTAMPTZ NOT NULL,
+    display_name   TEXT        NOT NULL,
+    iss            TEXT        NOT NULL,
+    aud            TEXT        NOT NULL,
+    client_id      TEXT        NOT NULL,
+    client_secret  TEXT        NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT tenant_oidc_providers_pk
+        PRIMARY KEY (tenant_id, provider_id, version)
 );
 
-CREATE INDEX tenant_oidc_configs_idx_01
-    ON tenant_oidc_configs (tenant_id, version DESC);
+CREATE INDEX tenant_oidc_providers_idx_01
+    ON tenant_oidc_providers (tenant_id, provider_id, version DESC);
+
+CREATE INDEX tenant_oidc_providers_idx_02
+    ON tenant_oidc_providers (iss, aud, version DESC);
 
 -- ============================================================
--- tenant_oidc_config_status（業務テナントOIDC設定ステータス）
+-- tenant_oidc_provider_status（業務テナントOIDCプロバイダーステータス）
 -- ============================================================
-CREATE TABLE tenant_oidc_config_status (
-    tenant_id    TEXT        NOT NULL,
-    iss          TEXT        NOT NULL,
-    aud          TEXT        NOT NULL,
-    version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
-    reason       TEXT,
-    created_at   TIMESTAMPTZ NOT NULL,
-    created_by   TEXT        NOT NULL,
-    CONSTRAINT tenant_oidc_config_status_pk PRIMARY KEY (tenant_id, iss, aud, version)
+CREATE TABLE tenant_oidc_provider_status (
+    tenant_id      TEXT        NOT NULL,
+    provider_id    TEXT        NOT NULL,
+    version        TIMESTAMPTZ NOT NULL,
+    status         TEXT        NOT NULL,
+    reason         TEXT,
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT tenant_oidc_provider_status_pk
+        PRIMARY KEY (tenant_id, provider_id, version)
 );
 
-CREATE INDEX tenant_oidc_config_status_idx_01
-    ON tenant_oidc_config_status (tenant_id, iss, aud, version DESC);
+CREATE INDEX tenant_oidc_provider_status_idx_01
+    ON tenant_oidc_provider_status (tenant_id, provider_id, version DESC);
 
-CREATE INDEX tenant_oidc_config_status_idx_02
-    ON tenant_oidc_config_status (status, version DESC);
+CREATE INDEX tenant_oidc_provider_status_idx_02
+    ON tenant_oidc_provider_status (status, version DESC);
 
 -- ============================================================
 -- tenant_settings（業務テナント拡張設定・JSON）
@@ -300,7 +308,7 @@ CREATE INDEX tenant_accounts_idx_01
 CREATE TABLE tenant_account_status (
     account_id   TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE / SUSPENDED
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -341,7 +349,7 @@ CREATE INDEX tenant_account_identities_idx_02
 CREATE TABLE tenant_account_identity_status (
     identity_id  TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
@@ -361,7 +369,7 @@ CREATE TABLE tenant_account_roles (
     role_id      TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
     account_id   TEXT        NOT NULL,
-    role         TEXT        NOT NULL, -- TENANT_ADMIN / EMPLOYEE
+    role         TEXT        NOT NULL,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,
     CONSTRAINT tenant_account_roles_pk PRIMARY KEY (role_id, version)
@@ -379,7 +387,7 @@ CREATE INDEX tenant_account_roles_idx_02
 CREATE TABLE tenant_account_role_status (
     role_id      TEXT        NOT NULL,
     version      TIMESTAMPTZ NOT NULL,
-    status       TEXT        NOT NULL, -- ACTIVE / INACTIVE
+    status       TEXT        NOT NULL,
     reason       TEXT,
     created_at   TIMESTAMPTZ NOT NULL,
     created_by   TEXT        NOT NULL,

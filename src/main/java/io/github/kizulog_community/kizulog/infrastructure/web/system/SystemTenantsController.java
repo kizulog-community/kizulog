@@ -32,6 +32,7 @@ import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantHostStatusChangeForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantRegistrationForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantStatusChangeForm;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 
@@ -50,6 +51,9 @@ import lombok.RequiredArgsConstructor;
  * <li>POST /system/tenants/{tenantId}/hosts                      - host追加</li>
  * <li>POST /system/tenants/{tenantId}/hosts/{host}/status        - hostステータス変更</li>
  * </ul>
+ *
+ * <p>テナント識別方式: 方式3「全URLにテナント識別子」。
+ * URLパターン: https://{host}/t/{slug}/...</p>
  *
  * @author Jun Kobayashi
  */
@@ -154,6 +158,7 @@ public class SystemTenantsController {
      * テナント詳細画面を表示する。
      *
      * @param id テナントID
+     * @param request HTTPリクエスト（スキーマ取得用）
      * @param model モデル
      * @param redirectAttrs リダイレクト属性（見つからない場合のリダイレクト用）
      * @return 詳細テンプレート、または一覧へのリダイレクト
@@ -161,6 +166,7 @@ public class SystemTenantsController {
     @GetMapping("/{tenantId}")
     public String detail(
             @PathVariable("tenantId") String id,
+            HttpServletRequest request,
             Model model,
             RedirectAttributes redirectAttrs) {
 
@@ -173,6 +179,8 @@ public class SystemTenantsController {
 
         model.addAttribute("activeMenu", "tenants");
         model.addAttribute("tenant", opt.get());
+        // ログインURL組み立て用のスキーマ
+        model.addAttribute("loginUrlScheme", request.getScheme());
 
         if (!model.containsAttribute("statusChangeForm")) {
             model.addAttribute("statusChangeForm", new TenantStatusChangeForm());

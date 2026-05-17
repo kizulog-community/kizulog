@@ -1,0 +1,435 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.oidc.detail.title})}">
+    <!-- layout.htmlの::headで置き換えられる -->
+</head>
+<body>
+
+    <nav th:replace="~{system/fragments/layout :: header}"></nav>
+
+    <div class="container-fluid">
+        <div class="row">
+
+            <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+            <main class="col-md-9 col-lg-10 system-content">
+
+                <!-- パンくず -->
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb small">
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants}"
+                               th:text="#{system.tenants.list.breadcrumb}">テナント管理</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{id}(id=${tenant.tenantId})}"
+                               th:text="${tenant.name}">テナント名</a>
+                        </li>
+                        <li class="breadcrumb-item">
+                            <a th:href="@{/system/tenants/{tid}/oidc-providers(tid=${tenant.tenantId})}"
+                               th:text="#{system.tenants.oidc.list.breadcrumb}">OIDCプロバイダー</a>
+                        </li>
+                        <li class="breadcrumb-item active" aria-current="page"
+                            th:text="${provider.providerId}">プロバイダーID</li>
+                    </ol>
+                </nav>
+
+                <!-- ページタイトル + アクションボタン -->
+                <div class="d-flex justify-content-between align-items-center mb-4">
+                    <h1 class="h3 mb-0">
+                        <i class="bi bi-shield-lock me-2"></i>
+                        <span th:text="${provider.displayName}">プロバイダー表示名</span>
+                    </h1>
+                    <div class="d-flex gap-2">
+                        <!-- 編集ボタン -->
+                        <a class="btn btn-outline-primary"
+                           th:href="@{/system/tenants/{tid}/oidc-providers/{pid}/edit(tid=${tenant.tenantId}, pid=${provider.providerId})}">
+                            <i class="bi bi-pencil me-1"></i>
+                            <span th:text="#{system.tenants.oidc.detail.button.edit}">編集</span>
+                        </a>
+                        <!-- ステータス変更ボタン -->
+                        <!-- ENABLED → DISABLED へ -->
+                        <button th:if="${provider.currentStatus.name() == 'ENABLED'}"
+                                type="button"
+                                class="btn btn-outline-secondary"
+                                data-bs-toggle="modal"
+                                data-bs-target="#tenantOidcStatusChangeModal"
+                                data-target-status="DISABLED">
+                            <i class="bi bi-pause-circle me-1"></i>
+                            <span th:text="#{system.tenants.oidc.detail.button.disable}">無効化</span>
+                        </button>
+                        <!-- DISABLED → ENABLED へ -->
+                        <button th:if="${provider.currentStatus.name() == 'DISABLED'}"
+                                type="button"
+                                class="btn btn-outline-success"
+                                data-bs-toggle="modal"
+                                data-bs-target="#tenantOidcStatusChangeModal"
+                                data-target-status="ENABLED">
+                            <i class="bi bi-play-circle me-1"></i>
+                            <span th:text="#{system.tenants.oidc.detail.button.enable}">有効化</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 成功フラッシュ -->
+                <div th:if="${flashSuccessKey}"
+                     class="alert alert-success alert-dismissible fade show" role="alert">
+                    <i class="bi bi-check-circle me-2"></i>
+                    <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- エラーフラッシュ（メッセージ） -->
+                <div th:if="${flashErrorMessage}"
+                     class="alert alert-danger alert-dismissible fade show" role="alert">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span th:text="${flashErrorMessage}">エラーが発生しました</span>
+                    <button type="button" class="btn-close"
+                            data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
+
+                <!-- 基本情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <span th:text="#{system.tenants.oidc.detail.section.basic}">基本情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.providerId}">プロバイダーID</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${provider.providerId}">master</code>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.tenants.oidc.detail.note.providerIdImmutable}">
+                                    （変更不可）
+                                </small>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.displayName}">表示名</dt>
+                            <dd class="col-sm-9" th:text="${provider.displayName}">表示名</dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.status}">ステータス</dt>
+                            <dd class="col-sm-9">
+                                <span th:if="${provider.currentStatus.name() == 'ENABLED'}"
+                                      class="badge bg-success">
+                                    <i class="bi bi-check-circle me-1"></i>
+                                    <span th:text="#{system.tenants.oidc.status.ENABLED}">有効</span>
+                                </span>
+                                <span th:if="${provider.currentStatus.name() == 'DISABLED'}"
+                                      class="badge bg-secondary">
+                                    <i class="bi bi-pause-circle me-1"></i>
+                                    <span th:text="#{system.tenants.oidc.status.DISABLED}">無効</span>
+                                </span>
+                                <span th:if="${provider.currentStatusReason != null and !#strings.isEmpty(provider.currentStatusReason)}"
+                                      class="text-muted ms-2 small"
+                                      th:text="${'(' + provider.currentStatusReason + ')'}">(...)</span>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- OIDC接続情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-link-45deg me-2"></i>
+                            <span th:text="#{system.tenants.oidc.detail.section.oidc}">OIDC接続情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.iss}">Issuer URI</dt>
+                            <dd class="col-sm-9">
+                                <code class="text-break" th:text="${provider.iss}">https://...</code>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.tenants.oidc.detail.note.issImmutable}">
+                                    （変更不可）
+                                </small>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.aud}">Audience</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${provider.aud}">audience</code>
+                                <small class="text-muted ms-2"
+                                       th:text="#{system.tenants.oidc.detail.note.audImmutable}">
+                                    （変更不可）
+                                </small>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.clientId}">Client ID</dt>
+                            <dd class="col-sm-9">
+                                <code th:text="${provider.clientId}">client-id</code>
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.clientSecret}">Client Secret</dt>
+                            <dd class="col-sm-9">
+                                <code class="text-muted"
+                                      th:text="#{system.tenants.oidc.detail.note.clientSecretMasked}">
+                                    設定済み（マスク表示）
+                                </code>
+                            </dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- 監査情報 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-clock-history me-2"></i>
+                            <span th:text="#{system.tenants.oidc.detail.section.audit}">監査情報</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <dl class="row mb-0">
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.createdAt}">作成日時</dt>
+                            <dd class="col-sm-9 small text-muted"
+                                th:text="${#temporals.format(provider.createdAt, 'yyyy-MM-dd HH:mm:ss')}">
+                                2026-05-17 00:00:00
+                            </dd>
+
+                            <dt class="col-sm-3"
+                                th:text="#{system.tenants.oidc.field.createdBy}">作成者</dt>
+                            <dd class="col-sm-9 small text-muted font-monospace"
+                                th:text="${provider.createdBy}">creator</dd>
+                        </dl>
+                    </div>
+                </div>
+
+                <!-- ステータス変更履歴 -->
+                <div class="card mb-3">
+                    <div class="card-header">
+                        <h6 class="mb-0">
+                            <i class="bi bi-list-ul me-2"></i>
+                            <span th:text="#{system.tenants.oidc.detail.section.statusHistory}">
+                                ステータス変更履歴
+                            </span>
+                        </h6>
+                    </div>
+                    <div class="card-body p-0">
+                        <table class="table mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th th:text="#{system.tenants.oidc.detail.history.column.version}">日時</th>
+                                    <th th:text="#{system.tenants.oidc.detail.history.column.status}">ステータス</th>
+                                    <th th:text="#{system.tenants.oidc.detail.history.column.reason}">理由</th>
+                                    <th th:text="#{system.tenants.oidc.detail.history.column.createdBy}">実行者</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="entry : ${provider.statusHistory}">
+                                    <td class="small"
+                                        th:text="${#temporals.format(entry.version, 'yyyy-MM-dd HH:mm:ss')}">
+                                        2026-05-17 00:00:00
+                                    </td>
+                                    <td>
+                                        <span th:if="${entry.status.name() == 'ENABLED'}"
+                                              class="badge bg-success">
+                                            <span th:text="#{system.tenants.oidc.status.ENABLED}">有効</span>
+                                        </span>
+                                        <span th:if="${entry.status.name() == 'DISABLED'}"
+                                              class="badge bg-secondary">
+                                            <span th:text="#{system.tenants.oidc.status.DISABLED}">無効</span>
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <span th:if="${entry.reason != null}"
+                                              th:text="${entry.reason}">理由</span>
+                                        <span th:if="${entry.reason == null}"
+                                              class="text-muted small">—</span>
+                                    </td>
+                                    <td class="small text-muted font-monospace"
+                                        th:text="${entry.createdBy}">creator</td>
+                                </tr>
+                                <tr th:if="${#lists.isEmpty(provider.statusHistory)}">
+                                    <td colspan="4" class="text-center text-muted py-3"
+                                        th:text="#{system.tenants.oidc.detail.history.empty}">
+                                        履歴はまだありません。
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- 戻るリンク -->
+                <div class="mb-4">
+                    <a th:href="@{/system/tenants/{tid}/oidc-providers(tid=${tenant.tenantId})}"
+                       class="btn btn-link text-decoration-none">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{system.tenants.oidc.detail.button.back}">一覧に戻る</span>
+                    </a>
+                </div>
+
+                <!-- ============================================================ -->
+                <!-- ステータス変更モーダル                                       -->
+                <!-- ============================================================ -->
+                <div class="modal fade" id="tenantOidcStatusChangeModal"
+                     tabindex="-1"
+                     aria-labelledby="tenantOidcStatusChangeModalLabel"
+                     aria-hidden="true">
+                    <div class="modal-dialog">
+                        <form th:action="@{/system/tenants/{tid}/oidc-providers/{pid}/status(tid=${tenant.tenantId}, pid=${provider.providerId})}"
+                              th:object="${statusChangeForm}"
+                              method="post"
+                              novalidate
+                              class="modal-content">
+                            <div class="modal-header">
+                                <h5 class="modal-title"
+                                    id="tenantOidcStatusChangeModalLabel"
+                                    th:text="#{system.tenants.oidc.detail.statusChange.modal.title}">
+                                    ステータス変更の確認
+                                </h5>
+                                <button type="button" class="btn-close"
+                                        data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body">
+                                <p th:text="#{system.tenants.oidc.detail.statusChange.modal.confirm}">
+                                    以下のOIDCプロバイダーのステータスを変更します。よろしいですか?
+                                </p>
+                                <p class="small">
+                                    <strong th:text="${provider.displayName}">プロバイダー名</strong>
+                                    （<code th:text="${provider.providerId}">master</code>）
+                                </p>
+
+                                <!-- 隠しフィールド: targetStatus -->
+                                <input type="hidden" th:field="*{targetStatus}"
+                                       id="tenantOidcTargetStatusField" />
+
+                                <!-- 変更先表示 -->
+                                <div class="mb-3">
+                                    <label class="form-label small"
+                                           th:text="#{system.tenants.oidc.detail.statusChange.modal.targetStatusLabel}">
+                                        変更先ステータス
+                                    </label>
+                                    <div>
+                                        <span id="tenantOidcTargetStatusDisplay"
+                                              class="badge text-bg-secondary"
+                                              th:text="#{system.tenants.oidc.detail.statusChange.modal.unspecified}">
+                                            未指定
+                                        </span>
+                                    </div>
+                                    <div class="invalid-feedback d-block"
+                                         th:if="${#fields.hasErrors('targetStatus')}"
+                                         th:errors="*{targetStatus}">エラー</div>
+                                </div>
+
+                                <!-- 警告（設計W2: 最後のENABLED無効化時、警告表示のみ） -->
+                                <div id="lastEnabledWarning"
+                                     class="alert alert-warning small d-none" role="alert">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    <span th:text="#{system.tenants.oidc.detail.statusChange.modal.lastEnabledWarning}">
+                                        最後のENABLEDプロバイダーを無効化すると、このテナントへのログインができなくなります。
+                                    </span>
+                                </div>
+
+                                <!-- 変更理由 -->
+                                <div class="mb-3">
+                                    <label for="reasonField" class="form-label small"
+                                           th:text="#{system.tenants.oidc.detail.statusChange.modal.reasonLabel}">
+                                        変更理由（必須）
+                                    </label>
+                                    <textarea id="reasonField"
+                                              th:field="*{reason}"
+                                              class="form-control"
+                                              th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid' : ''"
+                                              rows="3"
+                                              maxlength="1000"
+                                              required></textarea>
+                                    <div class="invalid-feedback"
+                                         th:if="${#fields.hasErrors('reason')}"
+                                         th:errors="*{reason}">エラー</div>
+                                </div>
+                            </div>
+                            <div class="modal-footer">
+                                <button type="button" class="btn btn-outline-secondary"
+                                        data-bs-dismiss="modal"
+                                        th:text="#{system.tenants.oidc.detail.modal.dismiss}">
+                                    キャンセル
+                                </button>
+                                <button type="submit" class="btn btn-primary"
+                                        th:text="#{system.tenants.oidc.detail.modal.submit}">
+                                    変更を実行
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+            </main>
+
+        </div>
+    </div>
+
+    <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
+
+    <!-- サーバー側判定: 「最後のENABLED」フラグ -->
+    <!-- Controllerの detail メソッドで計算済み: -->
+    <!-- 現在のプロバイダーがENABLED かつ 他にENABLEDが存在しない場合のみ true -->
+    <script th:inline="javascript">
+        /*<![CDATA[*/
+        const IS_LAST_ENABLED = /*[[${isLastEnabled}]]*/ false;
+
+        // ステータス値のラベルとバッジクラス
+        const STATUS_LABELS = {
+            ENABLED:  /*[[#{system.tenants.oidc.status.ENABLED}]]*/ 'ENABLED',
+            DISABLED: /*[[#{system.tenants.oidc.status.DISABLED}]]*/ 'DISABLED'
+        };
+        const STATUS_BADGE = {
+            ENABLED:  'badge text-bg-success',
+            DISABLED: 'badge text-bg-secondary'
+        };
+        /*]]>*/
+    </script>
+
+    <!-- ステータス変更モーダル: 開いたボタンから target を取得して隠しフィールドに設定 -->
+    <script>
+    (function () {
+        const modalEl = document.getElementById('tenantOidcStatusChangeModal');
+        if (!modalEl) return;
+        const hidden = document.getElementById('tenantOidcTargetStatusField');
+        const display = document.getElementById('tenantOidcTargetStatusDisplay');
+        const warningEl = document.getElementById('lastEnabledWarning');
+
+        modalEl.addEventListener('show.bs.modal', function (event) {
+            const trigger = event.relatedTarget;
+            if (!trigger) return;
+            const target = trigger.getAttribute('data-target-status');
+            if (target && hidden) hidden.value = target;
+            if (target && display) {
+                display.textContent = STATUS_LABELS[target] || target;
+                display.className = STATUS_BADGE[target] || 'badge text-bg-secondary';
+            }
+            // 警告表示判定:
+            // 「最後のENABLED」かつ DISABLED への遷移時のみ警告表示
+            // IS_LAST_ENABLED は Controller 側で正確に計算された値
+            if (target === 'DISABLED' && IS_LAST_ENABLED) {
+                warningEl.classList.remove('d-none');
+            } else {
+                warningEl.classList.add('d-none');
+            }
+        });
+    })();
+    </script>
+
+    <!-- バリデーションエラー時にモーダルを再オープン -->
+    <script th:if="${openModal == 'tenantOidcStatusChange'}">
+    (function () {
+        const el = document.getElementById('tenantOidcStatusChangeModal');
+        if (el) new bootstrap.Modal(el).show();
+    })();
+    </script>
+
+</body>
+</html>
