@@ -457,4 +457,43 @@ CREATE INDEX system_account_localization_idx_02
 
 CREATE INDEX system_account_localization_idx_03
     ON system_account_localization (timezone_id, version DESC);
-    
+
+-- ============================================================
+-- tenant_admin_invitations（テナント管理者招待）
+-- ============================================================
+CREATE TABLE tenant_admin_invitations (
+    invitation_id  TEXT        NOT NULL,
+    version        TIMESTAMPTZ NOT NULL,
+    tenant_id      TEXT        NOT NULL,
+    token_hash     TEXT        NOT NULL,
+    expires_at     TIMESTAMPTZ NOT NULL,
+    display_name   TEXT        NOT NULL,
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT tenant_admin_invitations_pk PRIMARY KEY (invitation_id, version)
+);
+
+CREATE UNIQUE INDEX tenant_admin_invitations_uk_01
+    ON tenant_admin_invitations (token_hash);
+
+CREATE INDEX tenant_admin_invitations_idx_01
+    ON tenant_admin_invitations (tenant_id, version DESC);
+
+-- ============================================================
+-- tenant_admin_invitation_status（テナント管理者招待ステータス）
+-- ============================================================
+CREATE TABLE tenant_admin_invitation_status (
+    invitation_id  TEXT        NOT NULL,
+    version        TIMESTAMPTZ NOT NULL,
+    status         TEXT        NOT NULL,
+    reason         TEXT,
+    created_at     TIMESTAMPTZ NOT NULL,
+    created_by     TEXT        NOT NULL,
+    CONSTRAINT tenant_admin_invitation_status_pk PRIMARY KEY (invitation_id, version)
+);
+
+CREATE INDEX tenant_admin_invitation_status_idx_01
+    ON tenant_admin_invitation_status (invitation_id, version DESC);
+
+CREATE INDEX tenant_admin_invitation_status_idx_02
+    ON tenant_admin_invitation_status (status, version DESC);

@@ -196,6 +196,26 @@ public class TenantOidcProviderService {
     }
 
     /**
+     * テナントの指定プロバイダーが認証に利用可能（ENABLED）な場合のみ復号済みDTOを取得する。
+     *
+     * @param tenantId テナントID
+     * @param providerId プロバイダー識別子
+     * @return ENABLEDな場合の復号済みDTO、それ以外は空Optional
+     */
+    @Transactional(readOnly = true)
+    public Optional<DecryptedTenantOidcProvider> findEnabledForAuthentication(
+            String tenantId, String providerId) {
+        Optional<TenantOidcProviderStatus> statusOpt =
+                statusRepository.findLatestByTenantIdAndProviderId(tenantId, providerId);
+        if (statusOpt.isEmpty()
+                || statusOpt.get().getStatus() != TenantOidcProviderStatusValue.ENABLED) {
+            return Optional.empty();
+        }
+        return providerRepository.findLatestByTenantIdAndProviderId(tenantId, providerId)
+                .map(this::toDecrypted);
+    }
+
+    /**
      * (iss, aud) に紐づく全テナントのプロバイダーを復号済みDTOで取得する。
      *
      * @param iss OIDC Issuer URI
@@ -216,12 +236,6 @@ public class TenantOidcProviderService {
 
     /**
      * 新規プロバイダーを登録する。
-     *
-     * <p>4種類のエンティティ保存をトランザクション内で行う：</p>
-     * <ol>
-     * <li>TenantOidcProvider（プロバイダー本体）</li>
-     * <li>TenantOidcProviderStatus（初期ENABLED）</li>
-     * </ol>
      *
      * @param tenantId テナントID
      * @param providerId プロバイダー識別子

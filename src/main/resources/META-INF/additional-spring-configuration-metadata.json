@@ -5,6 +5,13 @@
       "type": "java.lang.String",
       "description": "AES暗号化に使用する32バイトの秘密鍵。OIDCクライアントシークレット等の機密情報の暗号化/復号で使用される。本番環境では環境変数CRYPTO_SECRET_KEYから注入し、絶対にリポジトリにコミットしないこと。",
       "sourceType": "io.github.kizulog_community.kizulog.infrastructure.crypto.CryptoService"
+    },
+    {
+      "name": "kizulog.system.host",
+      "type": "java.lang.String",
+      "description": "システム管理画面(/system/**)およびシステムOIDCログインを提供するホスト名。このホスト宛のリクエストをSystemSecurityConfig(@Order(1))が処理し、それ以外のホストはTenantSecurityConfig(@Order(2))がテナント候補として処理する。request.getServerName()とこの値の完全一致(小文字化して比較)で判定するため、nginxが透過するHostヘッダーの値と正確に一致させること。ポート番号・スキームは含めない。本番環境では環境変数KIZULOG_SYSTEM_HOSTから注入する。",
+      "defaultValue": "kizulog.dev.internal",
+      "sourceType": "io.github.kizulog_community.kizulog.infrastructure.security.matcher.SystemHostMatcher"
     }
   ]
 }

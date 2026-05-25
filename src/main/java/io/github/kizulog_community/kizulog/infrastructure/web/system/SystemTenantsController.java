@@ -26,6 +26,7 @@ import io.github.kizulog_community.kizulog.domain.tenant.model.TenantDetailView;
 import io.github.kizulog_community.kizulog.domain.tenant.model.TenantHostStatusValue;
 import io.github.kizulog_community.kizulog.domain.tenant.model.TenantListItemView;
 import io.github.kizulog_community.kizulog.domain.tenant.service.TenantManagementService;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.service.TenantOidcProviderService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantEditForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantHostAddForm;
@@ -68,6 +69,9 @@ public class SystemTenantsController {
 
     /** テナント管理サービス */
     private final TenantManagementService tenantManagementService;
+
+    /** テナントOIDCプロバイダー管理サービス */
+    private final TenantOidcProviderService tenantOidcProviderService;
 
     /** メッセージソース */
     private final MessageSource messageSource;
@@ -181,6 +185,9 @@ public class SystemTenantsController {
         model.addAttribute("tenant", opt.get());
         // ログインURL組み立て用のスキーマ
         model.addAttribute("loginUrlScheme", request.getScheme());
+        // テナントに登録されたOIDCプロバイダー一覧（display_name昇順）
+        model.addAttribute("oidcProviders",
+                tenantOidcProviderService.listAllByTenantId(id));
 
         if (!model.containsAttribute("statusChangeForm")) {
             model.addAttribute("statusChangeForm", new TenantStatusChangeForm());

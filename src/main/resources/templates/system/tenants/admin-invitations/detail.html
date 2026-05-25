@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.invitation.detail.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/tenants}"
+                           th:text="#{system.menu.tenants}">テナント管理</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{'/system/tenants/' + ${tenant.tenantId}}"
+                           th:text="${tenant.name}">テナント名</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations'}"
+                           th:text="#{system.tenants.invitation.list.breadcrumb}">管理者招待</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.tenants.invitation.detail.breadcrumb}">詳細</li>
+                </ol>
+            </nav>
+
+            <!-- フラッシュメッセージ -->
+            <div th:if="${flashSuccessKey}" class="alert alert-success" role="alert">
+                <i class="bi bi-check-circle-fill me-1"></i>
+                <span th:text="#{__${flashSuccessKey}__}">成功</span>
+            </div>
+            <div th:if="${flashErrorMessage}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="${flashErrorMessage}">エラー</span>
+            </div>
+
+            <!-- 発行直後モード: 受諾URL表示カード(flashAttribute由来、リロードで消える) -->
+            <div th:if="${issuedView != null}" class="card border-success mb-4">
+                <div class="card-header bg-success text-white">
+                    <i class="bi bi-check-circle-fill me-2"></i>
+                    <span th:text="#{system.tenants.invitation.detail.issued.heading}">招待URLを発行しました</span>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning small mb-3">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                        <span th:text="#{system.tenants.invitation.detail.issued.warning}">
+                            この招待URLは今だけ表示されます。閉じると再表示できません。
+                        </span>
+                    </div>
+
+                    <label class="form-label small text-muted"
+                           th:text="#{system.tenants.invitation.detail.issued.urlLabel}">招待URL</label>
+                    <div class="input-group mb-2">
+                        <input type="text"
+                               id="inviteUrlInput"
+                               th:value="${issuedView.inviteUrl}"
+                               class="form-control font-monospace small"
+                               readonly />
+                        <button type="button" class="btn btn-outline-primary" id="copyBtn">
+                            <i class="bi bi-clipboard me-1"></i>
+                            <span th:text="#{system.tenants.invitation.detail.issued.copyButton}">コピー</span>
+                        </button>
+                    </div>
+                    <div id="copyMsg" class="small text-success" style="display: none;">
+                        <i class="bi bi-check-lg me-1"></i>
+                        <span th:text="#{system.tenants.invitation.detail.issued.copied}">クリップボードにコピーしました</span>
+                    </div>
+
+                    <div class="mt-3 small text-muted">
+                        <i class="bi bi-clock me-1"></i>
+                        <span th:text="#{system.tenants.invitation.detail.issued.expiresLabel}">有効期限:</span>
+                        <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(issuedView.expiresAt)}">
+                            2026-05-15 18:00
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <h1 class="h3 mb-3">
+                <i class="bi bi-person-badge me-2"></i>
+                <span th:text="#{system.tenants.invitation.detail.title}">招待詳細</span>
+            </h1>
+
+            <!-- 詳細表示 -->
+            <div class="card mb-3">
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3"
+                            th:text="#{system.tenants.invitation.detail.field.displayName}">表示名</dt>
+                        <dd class="col-sm-9" th:text="${invitation.displayName}">表示名</dd>
+
+                        <dt class="col-sm-3"
+                            th:text="#{system.tenants.invitation.detail.field.status}">ステータス</dt>
+                        <dd class="col-sm-9">
+                            <span th:if="${invitation.status.name() == 'PENDING' and !invitation.expired}"
+                                  class="badge text-bg-primary"
+                                  th:text="#{system.tenants.invitation.status.PENDING}">受諾待ち</span>
+                            <span th:if="${invitation.status.name() == 'PENDING' and invitation.expired}"
+                                  class="badge text-bg-secondary"
+                                  th:text="#{system.tenants.invitation.status.EXPIRED}">期限切れ</span>
+                            <span th:if="${invitation.status.name() == 'USED'}"
+                                  class="badge text-bg-success"
+                                  th:text="#{system.tenants.invitation.status.USED}">使用済</span>
+                            <span th:if="${invitation.status.name() == 'CANCELLED'}"
+                                  class="badge text-bg-dark"
+                                  th:text="#{system.tenants.invitation.status.CANCELLED}">取消済</span>
+                        </dd>
+
+                        <dt class="col-sm-3"
+                            th:text="#{system.tenants.invitation.detail.field.expiresAt}">有効期限</dt>
+                        <dd class="col-sm-9"
+                            th:text="${@dateTimeFormatHelper.formatDateTime(invitation.expiresAt)}">
+                            2026-05-15 18:00:00
+                        </dd>
+
+                        <dt class="col-sm-3"
+                            th:text="#{system.tenants.invitation.detail.field.createdAt}">作成日時</dt>
+                        <dd class="col-sm-9"
+                            th:text="${@dateTimeFormatHelper.formatDateTime(invitation.createdAt)}">
+                            2026-05-14 18:00:00
+                        </dd>
+
+                        <dt class="col-sm-3"
+                            th:text="#{system.tenants.invitation.detail.field.createdBy}">作成者</dt>
+                        <dd class="col-sm-9 font-monospace small" th:text="${invitation.createdBy}">creator</dd>
+
+                        <dt class="col-sm-3" th:if="${invitation.reason != null}"
+                            th:text="#{system.tenants.invitation.detail.field.reason}">理由</dt>
+                        <dd class="col-sm-9" th:if="${invitation.reason != null}"
+                            th:text="${invitation.reason}">理由</dd>
+
+                        <dt class="col-sm-3" th:if="${invitation.statusUpdatedAt != null}"
+                            th:text="#{system.tenants.invitation.detail.field.statusUpdatedAt}">ステータス更新</dt>
+                        <dd class="col-sm-9" th:if="${invitation.statusUpdatedAt != null}">
+                            <span th:text="${@dateTimeFormatHelper.formatDateTime(invitation.statusUpdatedAt)}">
+                                2026-05-14 18:30:00
+                            </span>
+                            <span th:if="${invitation.statusUpdatedBy != null}" class="text-muted small ms-2"
+                                  th:text="'(' + ${invitation.statusUpdatedBy} + ')'">(updater)</span>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+
+            <!-- アクション -->
+            <div class="d-flex justify-content-between">
+                <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations'}"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    <span th:text="#{system.tenants.invitation.detail.button.back}">一覧に戻る</span>
+                </a>
+
+                <!-- 取消ボタン: cancellable=trueのみ表示 -->
+                <button th:if="${invitation.cancellable}"
+                        type="button"
+                        class="btn btn-danger"
+                        data-bs-toggle="modal"
+                        data-bs-target="#cancelModal">
+                    <i class="bi bi-x-circle me-1"></i>
+                    <span th:text="#{system.tenants.invitation.detail.button.cancel}">招待を取消</span>
+                </button>
+            </div>
+
+            <!-- 取消モーダル -->
+            <div th:if="${invitation.cancellable}"
+                 class="modal fade" id="cancelModal" tabindex="-1"
+                 aria-labelledby="cancelModalLabel" aria-hidden="true">
+                <div class="modal-dialog">
+                    <form th:action="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations/' + ${invitation.invitationId} + '/cancel'}"
+                          th:object="${cancelForm}"
+                          method="post"
+                          class="modal-content">
+                        <div class="modal-header">
+                            <h5 class="modal-title" id="cancelModalLabel"
+                                th:text="#{system.tenants.invitation.cancel.modal.title}">
+                                招待取消の確認
+                            </h5>
+                            <button type="button" class="btn-close"
+                                    data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body">
+                            <p th:text="#{system.tenants.invitation.cancel.modal.confirm}">
+                                以下の招待を取消します。よろしいですか?
+                            </p>
+                            <p class="text-muted small">
+                                <strong th:text="${invitation.displayName}">表示名</strong>
+                            </p>
+                            <div class="mb-3">
+                                <label for="cancelReason" class="form-label small"
+                                       th:text="#{system.tenants.invitation.cancel.modal.reasonLabel}">
+                                    取消理由（任意）
+                                </label>
+                                <textarea id="cancelReason"
+                                          th:field="*{reason}"
+                                          class="form-control"
+                                          th:classappend="${#fields.hasErrors('reason')} ? 'is-invalid' : ''"
+                                          rows="3"
+                                          maxlength="500"></textarea>
+                                <div class="invalid-feedback"
+                                     th:if="${#fields.hasErrors('reason')}"
+                                     th:errors="*{reason}">エラー</div>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button type="button" class="btn btn-outline-secondary"
+                                    data-bs-dismiss="modal"
+                                    th:text="#{system.tenants.invitation.cancel.modal.dismiss}">
+                                キャンセル
+                            </button>
+                            <button type="submit" class="btn btn-danger"
+                                    th:text="#{system.tenants.invitation.cancel.modal.submit}">
+                                取消を実行
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+
+<!-- 発行直後モード時のクリップボードコピー機能 -->
+<script th:if="${issuedView != null}">
+(function() {
+    var copyBtn = document.getElementById('copyBtn');
+    var input = document.getElementById('inviteUrlInput');
+    var msg = document.getElementById('copyMsg');
+    if (!copyBtn || !input || !msg) {
+        return;
+    }
+    copyBtn.addEventListener('click', function() {
+        if (navigator.clipboard && window.isSecureContext) {
+            navigator.clipboard.writeText(input.value).then(function() {
+                showCopied();
+            });
+        } else {
+            input.select();
+            input.setSelectionRange(0, 99999);
+            try {
+                document.execCommand('copy');
+                showCopied();
+            } catch (e) {
+                /* no-op */
+            }
+        }
+    });
+    function showCopied() {
+        msg.style.display = 'block';
+        setTimeout(function() {
+            msg.style.display = 'none';
+        }, 3000);
+    }
+})();
+</script>
+
+<!-- バリデーションエラー時にモーダルを再オープン -->
+<script th:if="${openModal == 'cancel'}">
+(function() {
+    var modalEl = document.getElementById('cancelModal');
+    if (modalEl) {
+        var modal = new bootstrap.Modal(modalEl);
+        modal.show();
+    }
+})();
+</script>
+
+</body>
+</html>

@@ -307,6 +307,70 @@ class TenantOidcProviderServiceTest {
     }
 
     @Test
+    @DisplayName("findEnabledForAuthentication: ENABLEDの場合、復号済みDTOを返す")
+    void findEnabledForAuthentication_returnsDecrypted_whenEnabled() {
+        when(statusRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.of(statusOf(TENANT_ID, "master", BASE_TIME,
+                        TenantOidcProviderStatusValue.ENABLED)));
+        when(providerRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.of(providerOf(TENANT_ID, "master", BASE_TIME, "encrypted")));
+        when(cryptoPort.decrypt("encrypted")).thenReturn("plain-secret");
+
+        Optional<DecryptedTenantOidcProvider> result =
+                service.findEnabledForAuthentication(TENANT_ID, "master");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getProviderId()).isEqualTo("master");
+        assertThat(result.get().getClientSecret()).isEqualTo("plain-secret");
+    }
+
+    @Test
+    @DisplayName("findEnabledForAuthentication: DISABLEDの場合、空Optionalを返す")
+    void findEnabledForAuthentication_returnsEmpty_whenDisabled() {
+        when(statusRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.of(statusOf(TENANT_ID, "master", BASE_TIME,
+                        TenantOidcProviderStatusValue.DISABLED)));
+
+        Optional<DecryptedTenantOidcProvider> result =
+                service.findEnabledForAuthentication(TENANT_ID, "master");
+
+        assertThat(result).isEmpty();
+        verify(providerRepository, never())
+                .findLatestByTenantIdAndProviderId(TENANT_ID, "master");
+        verify(cryptoPort, never()).decrypt(anyString());
+    }
+
+    @Test
+    @DisplayName("findEnabledForAuthentication: ステータス未登録の場合、空Optionalを返す")
+    void findEnabledForAuthentication_returnsEmpty_whenNoStatus() {
+        when(statusRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.empty());
+
+        Optional<DecryptedTenantOidcProvider> result =
+                service.findEnabledForAuthentication(TENANT_ID, "master");
+
+        assertThat(result).isEmpty();
+        verify(providerRepository, never())
+                .findLatestByTenantIdAndProviderId(TENANT_ID, "master");
+    }
+
+    @Test
+    @DisplayName("findEnabledForAuthentication: ENABLEDだがプロバイダー本体がない場合、空Optionalを返す")
+    void findEnabledForAuthentication_returnsEmpty_whenEnabledButNoProvider() {
+        when(statusRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.of(statusOf(TENANT_ID, "master", BASE_TIME,
+                        TenantOidcProviderStatusValue.ENABLED)));
+        when(providerRepository.findLatestByTenantIdAndProviderId(TENANT_ID, "master"))
+                .thenReturn(Optional.empty());
+
+        Optional<DecryptedTenantOidcProvider> result =
+                service.findEnabledForAuthentication(TENANT_ID, "master");
+
+        assertThat(result).isEmpty();
+        verify(cryptoPort, never()).decrypt(anyString());
+    }
+
+    @Test
     @DisplayName("findDecryptedByIssAndAud: 該当プロバイダーが複数テナントに存在する場合、全てを返す")
     void findDecryptedByIssAndAud_returnsAllAcrossTenants() {
         TenantOidcProvider p1 = providerOf(TENANT_ID, "master", BASE_TIME, "enc1");

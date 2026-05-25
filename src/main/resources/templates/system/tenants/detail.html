@@ -32,11 +32,18 @@
                         <i class="bi bi-building me-2"></i>
                         <span th:text="${tenant.name}">テナント名</span>
                     </h1>
-                    <a class="btn btn-outline-primary"
-                       th:href="@{/system/tenants/{id}/edit(id=${tenant.tenantId})}">
-                        <i class="bi bi-pencil-square me-1"></i>
-                        <span th:text="#{system.tenants.detail.button.edit}">編集</span>
-                    </a>
+                    <div class="d-flex gap-2">
+                        <a class="btn btn-outline-secondary"
+                           th:href="@{/system/tenants/{id}/admin-invitations(id=${tenant.tenantId})}">
+                            <i class="bi bi-person-plus me-1"></i>
+                            <span th:text="#{system.tenants.invitation.list.title}">テナント管理者招待</span>
+                        </a>
+                        <a class="btn btn-outline-primary"
+                           th:href="@{/system/tenants/{id}/edit(id=${tenant.tenantId})}">
+                            <i class="bi bi-pencil-square me-1"></i>
+                            <span th:text="#{system.tenants.detail.button.edit}">編集</span>
+                        </a>
+                    </div>
                 </div>
 
                 <!-- 成功フラッシュ -->
@@ -358,6 +365,79 @@
                                                 </tbody>
                                             </table>
                                         </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+
+                    </div>
+                </div>
+
+                <!-- テナントOIDCプロバイダー -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <strong th:text="#{system.tenants.detail.section.oidcProviders}">
+                            OIDCプロバイダー
+                        </strong>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a class="btn btn-outline-secondary"
+                               th:href="@{/system/tenants/{id}/oidc-providers(id=${tenant.tenantId})}">
+                                <i class="bi bi-list-ul me-1"></i>
+                                <span th:text="#{system.tenants.detail.oidcProviders.button.manage}">すべて管理</span>
+                            </a>
+                            <a class="btn btn-outline-primary"
+                               th:href="@{/system/tenants/{id}/oidc-providers/new(id=${tenant.tenantId})}">
+                                <i class="bi bi-plus-lg me-1"></i>
+                                <span th:text="#{system.tenants.detail.oidcProviders.button.add}">新規登録</span>
+                            </a>
+                        </div>
+                    </div>
+                    <div class="card-body p-0">
+
+                        <!-- 0件 -->
+                        <div th:if="${#lists.isEmpty(oidcProviders)}"
+                             class="text-center py-4">
+                            <p class="mb-0 text-muted small"
+                               th:text="#{system.tenants.detail.oidcProviders.empty}">
+                                登録されたOIDCプロバイダーはありません。
+                            </p>
+                        </div>
+
+                        <!-- 一覧 -->
+                        <table th:unless="${#lists.isEmpty(oidcProviders)}"
+                               class="table mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th th:text="#{system.tenants.oidc.list.column.displayName}">表示名</th>
+                                    <th th:text="#{system.tenants.oidc.list.column.providerId}">プロバイダーID</th>
+                                    <th th:text="#{system.tenants.oidc.list.column.status}">ステータス</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr th:each="provider : ${oidcProviders}">
+                                    <td th:text="${provider.displayName}">Keycloak</td>
+                                    <td>
+                                        <code th:text="${provider.providerId}">keycloak</code>
+                                    </td>
+                                    <td>
+                                        <span th:if="${provider.currentStatus.name() == 'ENABLED'}"
+                                              class="badge bg-success">
+                                            <i class="bi bi-check-circle me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.status.ENABLED}">有効</span>
+                                        </span>
+                                        <span th:if="${provider.currentStatus.name() == 'DISABLED'}"
+                                              class="badge bg-secondary">
+                                            <i class="bi bi-x-circle me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.status.DISABLED}">無効</span>
+                                        </span>
+                                    </td>
+                                    <td class="text-end">
+                                        <a class="btn btn-sm btn-outline-secondary"
+                                           th:href="@{/system/tenants/{id}/oidc-providers/{pid}(id=${tenant.tenantId},pid=${provider.providerId})}">
+                                            <i class="bi bi-eye me-1"></i>
+                                            <span th:text="#{system.tenants.oidc.list.action.detail}">詳細</span>
+                                        </a>
                                     </td>
                                 </tr>
                             </tbody>

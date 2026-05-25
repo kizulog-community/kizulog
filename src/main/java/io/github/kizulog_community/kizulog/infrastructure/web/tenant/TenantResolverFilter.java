@@ -3,8 +3,6 @@ package io.github.kizulog_community.kizulog.infrastructure.web.tenant;
 import java.io.IOException;
 import java.util.List;
 import java.util.Optional;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -20,6 +18,7 @@ import io.github.kizulog_community.kizulog.domain.tenant.port.TenantHostReposito
 import io.github.kizulog_community.kizulog.domain.tenant.port.TenantHostStatusRepository;
 import io.github.kizulog_community.kizulog.domain.tenant.port.TenantRepository;
 import io.github.kizulog_community.kizulog.domain.tenant.port.TenantStatusRepository;
+import io.github.kizulog_community.kizulog.infrastructure.security.matcher.SystemHostMatcher;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -29,15 +28,12 @@ import lombok.RequiredArgsConstructor;
 /**
  * テナント識別フィルタ
  *
- * <p>URL パターン /t/{slug}/... からテナントを識別し、TenantContext に設定するフィルタ。</p>
- *
  * <p>処理フロー:</p>
  * <ol>
- * <li>URLが {@code /t/} で始まらない場合は素通し（このフィルタ対象外）</li>
- * <li>URLから slug を抽出（[a-z0-9-]{21}に一致しない場合は404）</li>
- * <li>slug でテナントを検索（存在しなければ404）</li>
+ * <li>リクエストがシステムホスト宛なら素通し（テナント対象外）</li>
+ * <li>リクエストhostを取得（取得不可なら404）</li>
+ * <li>hostに紐づくACTIVEなテナントを解決（見つからなければ404）</li>
  * <li>テナントステータスを確認（ACTIVE でなければ404）</li>
- * <li>リクエストhost が tenant_hosts にACTIVE状態で存在するか確認（不一致なら404）</li>
  * <li>TenantContext にテナントを設定して後続フィルタへ</li>
  * <li>finally で必ず TenantContext#clear()</li>
  * </ol>
@@ -50,12 +46,8 @@ public class TenantResolverFilter extends OncePerRequestFilter {
     /** ロガー */
     private static final Logger log = LoggerFactory.getLogger(TenantResolverFilter.class);
 
-    /** テナントURLパターン: /t/{slug}/... または /t/{slug} */
-    private static final Pattern TENANT_URL_PATTERN =
-            Pattern.compile("^/t/([a-z0-9-]{21})(?:/.*)?$");
-
-    /** URLパスのテナント識別プレフィックス */
-    private static final String TENANT_PATH_PREFIX = "/t/";
+    /** システムホスト判定マッチャ */
+    private final SystemHostMatcher systemHostMatcher;
 
     /** テナントリポジトリ */
     private final TenantRepository tenantRepository;
@@ -75,32 +67,24 @@ public class TenantResolverFilter extends OncePerRequestFilter {
             HttpServletResponse response,
             FilterChain filterChain) throws ServletException, IOException {
 
-        String path = request.getRequestURI();
-        String contextPath = request.getContextPath();
-        // contextPath を除去（Spring Boot デフォルトでは contextPath は空）
-        if (contextPath != null && !contextPath.isEmpty() && path.startsWith(contextPath)) {
-            path = path.substring(contextPath.length());
-        }
-
-        // /t/ で始まらないリクエストは素通し
-        if (!path.startsWith(TENANT_PATH_PREFIX)) {
+        // システムホスト宛は素通し（このフィルタの対象外）
+        if (systemHostMatcher.matches(request)) {
             filterChain.doFilter(request, response);
             return;
         }
 
-        // slug 抽出
-        Matcher matcher = TENANT_URL_PATTERN.matcher(path);
-        if (!matcher.matches()) {
-            log.warn("テナントURL不正: path={}", path);
+        // リクエスト host を取得
+        String requestHost = systemHostMatcher.resolveHost(request);
+        if (requestHost == null) {
+            log.warn("リクエストhostが取得できない");
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
-        String slug = matcher.group(1);
 
-        // テナント検索
-        Optional<Tenant> tenantOpt = tenantRepository.findLatestBySlug(slug);
+        // host に紐づくACTIVEなテナントを解決
+        Optional<Tenant> tenantOpt = resolveActiveTenantByHost(requestHost);
         if (tenantOpt.isEmpty()) {
-            log.warn("テナント未存在: slug={}", slug);
+            log.warn("hostに紐づく有効なテナントが存在しない: host={}", requestHost);
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
@@ -112,24 +96,8 @@ public class TenantResolverFilter extends OncePerRequestFilter {
                 .map(TenantStatus::getStatus)
                 .orElse(TenantStatusValue.INACTIVE);
         if (tenantStatus != TenantStatusValue.ACTIVE) {
-            log.warn("テナントがACTIVEではない: tenantId={}, slug={}, status={}",
-                    tenant.getTenantId(), slug, tenantStatus);
-            response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            return;
-        }
-
-        // リクエスト host を取得・正規化
-        String requestHost = extractHost(request);
-        if (requestHost == null) {
-            log.warn("リクエストhostが取得できない: slug={}", slug);
-            response.sendError(HttpServletResponse.SC_NOT_FOUND);
-            return;
-        }
-
-        // (tenantId, host) ペアの存在 + ACTIVE状態を確認
-        if (!isHostActiveForTenant(tenant.getTenantId(), requestHost)) {
-            log.warn("hostがテナントに紐づかない or 無効: tenantId={}, host={}, slug={}",
-                    tenant.getTenantId(), requestHost, slug);
+            log.warn("テナントがACTIVEではない: tenantId={}, host={}, status={}",
+                    tenant.getTenantId(), requestHost, tenantStatus);
             response.sendError(HttpServletResponse.SC_NOT_FOUND);
             return;
         }
@@ -137,8 +105,8 @@ public class TenantResolverFilter extends OncePerRequestFilter {
         // ここまで来たら識別成功
         try {
             TenantContext.set(tenant);
-            log.debug("テナント識別成功: tenantId={}, slug={}, host={}",
-                    tenant.getTenantId(), slug, requestHost);
+            log.debug("テナント識別成功: tenantId={}, host={}",
+                    tenant.getTenantId(), requestHost);
             filterChain.doFilter(request, response);
         } finally {
             TenantContext.clear();
@@ -146,40 +114,30 @@ public class TenantResolverFilter extends OncePerRequestFilter {
     }
 
     /**
-     * リクエスト host を取得する。
+     * host に紐づくACTIVE状態のテナントを解決する。
      *
-     * @param request HTTPリクエスト
-     * @return ホスト名（小文字化済み）、取得失敗時は null
+     * @param host ホスト名（小文字化済み）
+     * @return ACTIVE状態のテナント、なければ空Optional
      */
-    private String extractHost(HttpServletRequest request) {
-        String serverName = request.getServerName();
-        if (serverName == null || serverName.isEmpty()) {
-            return null;
-        }
-        return serverName.toLowerCase(java.util.Locale.ROOT);
-    }
-
-    /**
-     * 指定 (tenantId, host) がACTIVE状態で存在するかを判定する。
-     *
-     * @param tenantId テナントID
-     * @param host ホスト名
-     * @return ACTIVE状態で存在すればtrue
-     */
-    private boolean isHostActiveForTenant(String tenantId, String host) {
-        // tenant_hosts に登録されているか
+    private Optional<Tenant> resolveActiveTenantByHost(String host) {
         List<TenantHost> hosts = tenantHostRepository.findAllLatestByHost(host);
-        boolean linkedToTenant = hosts.stream()
-                .anyMatch(h -> h.getTenantId().equals(tenantId));
-        if (!linkedToTenant) {
-            return false;
+        for (TenantHost tenantHost : hosts) {
+            String tenantId = tenantHost.getTenantId();
+            // tenant_host_status がACTIVE か
+            TenantHostStatusValue hostStatus = tenantHostStatusRepository
+                    .findLatestByTenantIdAndHost(tenantId, host)
+                    .map(TenantHostStatus::getStatus)
+                    .orElse(TenantHostStatusValue.INACTIVE);
+            if (hostStatus != TenantHostStatusValue.ACTIVE) {
+                continue;
+            }
+            // テナント本体を取得
+            Optional<Tenant> tenantOpt = tenantRepository.findLatestByTenantId(tenantId);
+            if (tenantOpt.isPresent()) {
+                return tenantOpt;
+            }
         }
-        // tenant_host_status がACTIVE か
-        TenantHostStatusValue status = tenantHostStatusRepository
-                .findLatestByTenantIdAndHost(tenantId, host)
-                .map(TenantHostStatus::getStatus)
-                .orElse(TenantHostStatusValue.INACTIVE);
-        return status == TenantHostStatusValue.ACTIVE;
+        return Optional.empty();
     }
 
 }

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.invitation.list.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/tenants}"
+                           th:text="#{system.menu.tenants}">テナント管理</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{'/system/tenants/' + ${tenant.tenantId}}"
+                           th:text="${tenant.name}">テナント名</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.tenants.invitation.list.breadcrumb}">管理者招待</li>
+                </ol>
+            </nav>
+
+            <!-- ヘッダー -->
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h1 class="h3 mb-0">
+                    <i class="bi bi-person-plus me-2"></i>
+                    <span th:text="#{system.tenants.invitation.list.title}">テナント管理者招待</span>
+                </h1>
+                <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations/new'}"
+                   class="btn btn-primary">
+                    <i class="bi bi-plus-lg me-1"></i>
+                    <span th:text="#{system.tenants.invitation.list.button.add}">新規招待</span>
+                </a>
+            </div>
+
+            <!-- 対象テナント -->
+            <p class="text-muted small mb-3">
+                <span th:text="#{system.tenants.invitation.list.targetTenant}">対象テナント:</span>
+                <strong th:text="${tenant.name}">テナント名</strong>
+            </p>
+
+            <!-- フラッシュメッセージ -->
+            <div th:if="${flashErrorKey}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{__${flashErrorKey}__}">エラー</span>
+            </div>
+
+            <!-- 説明 -->
+            <p class="text-muted small mb-3" th:text="#{system.tenants.invitation.list.description}">
+                このテナントの管理者を招待するための一覧です。発行した招待URLは初回表示時のみ取得可能です。
+            </p>
+
+            <!-- テーブル -->
+            <div class="card">
+                <div class="card-body p-0">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th th:text="#{system.tenants.invitation.list.column.displayName}">表示名</th>
+                            <th th:text="#{system.tenants.invitation.list.column.status}">ステータス</th>
+                            <th th:text="#{system.tenants.invitation.list.column.createdAt}">作成日時</th>
+                            <th th:text="#{system.tenants.invitation.list.column.expiresAt}">有効期限</th>
+                            <th class="text-end"
+                                th:text="#{system.tenants.invitation.list.column.actions}">操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="item : ${items}">
+                            <td>
+                                <span th:text="${item.displayName}">表示名</span>
+                            </td>
+                            <td>
+                                <span th:if="${item.status.name() == 'PENDING' and !item.expired}"
+                                      class="badge text-bg-primary"
+                                      th:text="#{system.tenants.invitation.status.PENDING}">受諾待ち</span>
+                                <span th:if="${item.status.name() == 'PENDING' and item.expired}"
+                                      class="badge text-bg-secondary"
+                                      th:text="#{system.tenants.invitation.status.EXPIRED}">期限切れ</span>
+                                <span th:if="${item.status.name() == 'USED'}"
+                                      class="badge text-bg-success"
+                                      th:text="#{system.tenants.invitation.status.USED}">使用済</span>
+                                <span th:if="${item.status.name() == 'CANCELLED'}"
+                                      class="badge text-bg-dark"
+                                      th:text="#{system.tenants.invitation.status.CANCELLED}">取消済</span>
+                            </td>
+                            <td>
+                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.createdAt)}">
+                                    2026-05-14 18:00
+                                </span>
+                            </td>
+                            <td>
+                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.expiresAt)}">
+                                    2026-05-15 18:00
+                                </span>
+                            </td>
+                            <td class="text-end">
+                                <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations/' + ${item.invitationId}}"
+                                   class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-eye"></i>
+                                    <span th:text="#{system.tenants.invitation.list.action.detail}">詳細</span>
+                                </a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(items)}">
+                            <td colspan="5" class="text-center text-muted py-4"
+                                th:text="#{system.tenants.invitation.list.empty}">
+                                該当する招待はありません。
+                            </td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 戻る -->
+            <div class="mt-3">
+                <a th:href="@{'/system/tenants/' + ${tenant.tenantId}}"
+                   class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>
+                    <span th:text="#{system.tenants.invitation.list.button.backToTenant}">テナント詳細へ</span>
+                </a>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+</body>
+</html>

@@ -9,16 +9,19 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.oauth2.client.endpoint.OAuth2AccessTokenResponseClient;
 import org.springframework.security.oauth2.client.endpoint.OAuth2AuthorizationCodeGrantRequest;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher;
+import org.springframework.security.web.util.matcher.AndRequestMatcher;
+import org.springframework.security.web.util.matcher.OrRequestMatcher;
 
 import io.github.kizulog_community.kizulog.infrastructure.security.client.DynamicSystemClientRegistrationRepository;
 import io.github.kizulog_community.kizulog.infrastructure.security.handler.SystemAuthenticationFailureHandler;
 import io.github.kizulog_community.kizulog.infrastructure.security.handler.SystemAuthenticationSuccessHandler;
+import io.github.kizulog_community.kizulog.infrastructure.security.matcher.SystemHostMatcher;
 import io.github.kizulog_community.kizulog.infrastructure.security.oidc.SystemOidcUserService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 
 /**
  * システム管理画面用のSpring Security設定
- *
  *
  * <p>担当URL:
  * <ul>
@@ -61,6 +64,7 @@ public class SystemSecurityConfig {
     @Order(1)
     SecurityFilterChain systemSecurityFilterChain(
             HttpSecurity http,
+            SystemHostMatcher systemHostMatcher,
             DynamicSystemClientRegistrationRepository clientRegistrationRepository,
             SystemOidcUserService systemOidcUserService,
             SystemAuthenticationSuccessHandler systemAuthenticationSuccessHandler,
@@ -68,11 +72,16 @@ public class SystemSecurityConfig {
             ObjectProvider<OAuth2AccessTokenResponseClient<OAuth2AuthorizationCodeGrantRequest>>
                     tokenResponseClientProvider) throws Exception {
 
-        http.securityMatcher(
-                "/system/**",
-                "/oauth2/authorization/**",
-                "/login/oauth2/code/**",
-                "/logout")
+        // 担当パス（システムホスト宛のときのみ）
+        PathPatternRequestMatcher.Builder paths = PathPatternRequestMatcher.withDefaults();
+        OrRequestMatcher systemPaths = new OrRequestMatcher(
+                paths.matcher("/system/**"),
+                paths.matcher("/oauth2/authorization/**"),
+                paths.matcher("/login/oauth2/code/**"),
+                paths.matcher("/logout"));
+        // 「システムホスト宛」かつ「担当パス」のときのみ、このFilterChainが処理する。
+        // テナントホスト宛の同一パスはマッチせず、@Order(2)のテナントFilterChainへ流れる。
+        http.securityMatcher(new AndRequestMatcher(systemHostMatcher, systemPaths))
             .authorizeHttpRequests(auth -> auth
                 // ログインページとOAuth2フロー関連は認証不要
                 .requestMatchers("/system/login").permitAll()

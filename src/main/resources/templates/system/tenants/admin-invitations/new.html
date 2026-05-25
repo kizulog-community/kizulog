@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{system/fragments/layout :: head(title=#{system.tenants.invitation.new.title})}">
+</head>
+<body>
+
+<header th:replace="~{system/fragments/layout :: header}"></header>
+
+<div class="container-fluid">
+    <div class="row">
+        <aside th:replace="~{system/fragments/layout :: sidebar(activeMenu='tenants')}"></aside>
+
+        <main class="col-md-9 col-lg-10 system-content">
+            <!-- パンくず -->
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item">
+                        <a th:href="@{/system/tenants}"
+                           th:text="#{system.menu.tenants}">テナント管理</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{'/system/tenants/' + ${tenant.tenantId}}"
+                           th:text="${tenant.name}">テナント名</a>
+                    </li>
+                    <li class="breadcrumb-item">
+                        <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations'}"
+                           th:text="#{system.tenants.invitation.list.breadcrumb}">管理者招待</a>
+                    </li>
+                    <li class="breadcrumb-item active" aria-current="page"
+                        th:text="#{system.tenants.invitation.new.breadcrumb}">新規招待</li>
+                </ol>
+            </nav>
+
+            <h1 class="h3 mb-3">
+                <i class="bi bi-person-plus me-2"></i>
+                <span th:text="#{system.tenants.invitation.new.title}">新規テナント管理者招待</span>
+            </h1>
+
+            <p class="text-muted small mb-2">
+                <span th:text="#{system.tenants.invitation.list.targetTenant}">対象テナント:</span>
+                <strong th:text="${tenant.name}">テナント名</strong>
+            </p>
+
+            <p class="text-muted small mb-4" th:text="#{system.tenants.invitation.new.description}">
+                新しいテナント管理者を招待します。発行ボタンを押すと招待URLが表示されますので、招待先に伝えてください。
+            </p>
+
+            <!-- フラッシュエラー -->
+            <div th:if="${flashErrorMessage}" class="alert alert-danger" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="${flashErrorMessage}">エラー</span>
+            </div>
+
+            <!-- ホスト未登録の警告（案H1: 受諾URL生成にはホストが必須） -->
+            <div th:unless="${hasUsableHost}" class="alert alert-warning" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{system.tenants.invitation.new.noHostWarning}">
+                    このテナントには利用可能なホストが登録されていないため、招待URLを生成できません。
+                    先にテナントのホストを登録してください。
+                </span>
+            </div>
+
+            <div class="card">
+                <div class="card-body">
+                    <form th:action="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations'}"
+                          th:object="${invitationForm}"
+                          method="post">
+
+                        <!-- グローバルエラー -->
+                        <div th:if="${#fields.hasGlobalErrors()}"
+                             class="alert alert-danger py-2 small">
+                            <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                            <span th:each="err : ${#fields.globalErrors()}" th:text="${err}">エラー</span>
+                        </div>
+
+                        <!-- 表示名 -->
+                        <div class="mb-3">
+                            <label for="displayName" class="form-label">
+                                <span th:text="#{system.tenants.invitation.form.displayName.label}">表示名</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <input type="text"
+                                   id="displayName"
+                                   th:field="*{displayName}"
+                                   class="form-control"
+                                   th:classappend="${#fields.hasErrors('displayName')} ? 'is-invalid' : ''"
+                                   maxlength="100"
+                                   th:placeholder="#{system.tenants.invitation.form.displayName.placeholder}"
+                                   required />
+                            <div class="invalid-feedback"
+                                 th:if="${#fields.hasErrors('displayName')}"
+                                 th:errors="*{displayName}">エラー</div>
+                            <div class="form-text small"
+                                 th:text="#{system.tenants.invitation.form.displayName.help}">
+                                管理用ラベルです。本人氏名や役職など分かりやすい名前を入力してください。
+                            </div>
+                        </div>
+
+                        <!-- 有効期間 -->
+                        <div class="mb-3">
+                            <label for="durationHours" class="form-label">
+                                <span th:text="#{system.tenants.invitation.form.durationHours.label}">有効期間</span>
+                                <span class="text-danger">*</span>
+                            </label>
+                            <div class="input-group" style="max-width: 280px;">
+                                <input type="number"
+                                       id="durationHours"
+                                       th:field="*{durationHours}"
+                                       class="form-control"
+                                       th:classappend="${#fields.hasErrors('durationHours')} ? 'is-invalid' : ''"
+                                       min="1"
+                                       max="720"
+                                       required />
+                                <span class="input-group-text"
+                                      th:text="#{system.tenants.invitation.form.durationHours.unit}">時間</span>
+                                <div class="invalid-feedback"
+                                     th:if="${#fields.hasErrors('durationHours')}"
+                                     th:errors="*{durationHours}">エラー</div>
+                            </div>
+                            <div class="form-text small"
+                                 th:text="#{system.tenants.invitation.form.durationHours.help}">
+                                1〜720時間（最大30日）の範囲で指定します。デフォルトは24時間です。
+                            </div>
+                        </div>
+
+                        <!-- ボタン -->
+                        <div class="d-flex justify-content-end gap-2 mt-4">
+                            <a th:href="@{'/system/tenants/' + ${tenant.tenantId} + '/admin-invitations'}"
+                               class="btn btn-outline-secondary">
+                                <i class="bi bi-x-lg me-1"></i>
+                                <span th:text="#{system.tenants.invitation.form.button.cancel}">キャンセル</span>
+                            </a>
+                            <button type="submit" class="btn btn-primary"
+                                    th:disabled="${!hasUsableHost}">
+                                <i class="bi bi-send me-1"></i>
+                                <span th:text="#{system.tenants.invitation.form.button.issue}">招待を発行</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script th:replace="~{system/fragments/layout :: scripts}"></script>
+</body>
+</html>

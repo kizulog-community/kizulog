@@ -42,6 +42,9 @@ import io.github.kizulog_community.kizulog.domain.tenant.model.TenantHostStatusV
 import io.github.kizulog_community.kizulog.domain.tenant.model.TenantListItemView;
 import io.github.kizulog_community.kizulog.domain.tenant.model.TenantStatusValue;
 import io.github.kizulog_community.kizulog.domain.tenant.service.TenantManagementService;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderListItemView;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.service.TenantOidcProviderService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantEditForm;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.tenants.dto.TenantHostAddForm;
@@ -66,14 +69,17 @@ class SystemTenantsControllerTest {
             OffsetDateTime.of(2026, 5, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
     private TenantManagementService service;
+    private TenantOidcProviderService tenantOidcProviderService;
     private MessageSource messageSource;
     private SystemTenantsController sut;
 
     @BeforeEach
     void setUp() {
         service = mock(TenantManagementService.class);
+        tenantOidcProviderService = mock(TenantOidcProviderService.class);
         messageSource = mock(MessageSource.class);
-        sut = new SystemTenantsController(service, messageSource);
+        sut = new SystemTenantsController(
+                service, tenantOidcProviderService, messageSource);
     }
 
     private SystemUserPrincipal operator() {
@@ -202,6 +208,12 @@ class SystemTenantsControllerTest {
     void detail_found_renders() {
         TenantDetailView v = detailView("t1");
         when(service.findTenantDetail("t1")).thenReturn(Optional.of(v));
+        TenantOidcProviderListItemView providerView = new TenantOidcProviderListItemView(
+                "t1", "keycloak", "Keycloak",
+                "https://auth.example/realms/t1", "kizulog-t1",
+                TenantOidcProviderStatusValue.ENABLED, T0);
+        when(tenantOidcProviderService.listAllByTenantId("t1"))
+                .thenReturn(List.of(providerView));
 
         Model model = new ConcurrentModel();
         RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
@@ -216,6 +228,8 @@ class SystemTenantsControllerTest {
                 .isInstanceOf(TenantHostAddForm.class);
         assertThat(model.getAttribute("hostStatusChangeForm"))
                 .isInstanceOf(TenantHostStatusChangeForm.class);
+        assertThat(model.getAttribute("oidcProviders"))
+                .isEqualTo(List.of(providerView));
     }
 
     @Test
