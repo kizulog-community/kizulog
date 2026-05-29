@@ -27,15 +27,12 @@ import io.github.kizulog_community.kizulog.infrastructure.web.tenant.TenantResol
 /**
  * テナント利用者画面用のSpring Security設定
  *
- * <p>テナント識別方式: ホストベース（案S2）。
- * リクエストのホストがシステムホスト（kizulog.system.host）でない場合、
- * このFilterChain（@Order(2)）がテナント候補として処理する。</p>
- *
  * <p>担当範囲（システムホストでない全リクエスト）:
  * <ul>
  * <li>/login                   - テナントログイン画面（認証不要）</li>
  * <li>/oauth2/authorization/** - OAuth2認可開始（Spring Security固定パス）</li>
  * <li>/login/oauth2/code/**    - OAuth2コールバック（Spring Security固定パス）</li>
+ * <li>/admin-invite/**         - テナント管理者 招待受諾フロー（認証不要）</li>
  * <li>/admin/**                - テナント管理画面（ROLE_TENANT_ADMIN必須）</li>
  * <li>/                        - テナントトップ（認証必須）</li>
  * <li>静的リソース・/error      - 認証不要</li>
@@ -118,6 +115,8 @@ public class TenantSecurityConfig {
                 .requestMatchers("/login").permitAll()
                 .requestMatchers("/oauth2/authorization/**").permitAll()
                 .requestMatchers("/login/oauth2/code/**").permitAll()
+                // テナント管理者 招待受諾フロー（認証前にアクセスする）は認証不要
+                .requestMatchers("/admin-invite/**").permitAll()
                 // 静的リソース・エラーページは認証不要
                 .requestMatchers("/css/**", "/js/**", "/images/**", "/favicon.ico")
                     .permitAll()

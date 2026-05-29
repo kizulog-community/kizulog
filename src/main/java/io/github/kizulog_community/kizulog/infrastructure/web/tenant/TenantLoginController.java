@@ -2,6 +2,7 @@ package io.github.kizulog_community.kizulog.infrastructure.web.tenant;
 
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.springframework.stereotype.Controller;
@@ -9,14 +10,20 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 
+import io.github.kizulog_community.kizulog.domain.tenant.model.Tenant;
 import io.github.kizulog_community.kizulog.domain.tenantauth.exception.TenantAuthenticationErrorType;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderChoiceView;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.service.TenantOidcProviderService;
+import lombok.RequiredArgsConstructor;
 
 /**
  * テナント利用者ログインコントローラー
  *
  * <p>テナントログインページを表示する。
- * 実際の認証はSpring SecurityのOAuth2 Loginフロー（/oauth2/authorization/tenant-{tenantId}-{providerId}）
- * に委譲する。</p>
+ * 実際の認証はSpring SecurityのOAuth2 Loginフロー（/oauth2/authorization/tenant-{tenantId}-{providerId}）に委譲する。</p>
+ *
+ * <p>ログイン画面では、受諾アクセス元ホストから解決したテナントの ENABLED プロバイダーを
+ * registrationId 付きで取得し/oauth2/authorization/{registrationId}へのボタンを描画する。</p>
  *
  * <p>URL設計:
  * <ul>
@@ -33,6 +40,7 @@ import io.github.kizulog_community.kizulog.domain.tenantauth.exception.TenantAut
  * @author Jun Kobayashi
  */
 @Controller
+@RequiredArgsConstructor
 public class TenantLoginController {
 
     /** 不明なエラーコードを示すマーカー */
@@ -40,6 +48,9 @@ public class TenantLoginController {
 
     /** 許容エラーコードのホワイトリスト */
     private static final Set<String> ALLOWED_ERROR_CODES = buildAllowedErrorCodes();
+
+    /** テナントOIDCプロバイダーサービス */
+    private final TenantOidcProviderService tenantOidcProviderService;
 
     private static Set<String> buildAllowedErrorCodes() {
         Set<String> set = new HashSet<>();
@@ -66,7 +77,28 @@ public class TenantLoginController {
         model.addAttribute("error", hasError);
         model.addAttribute("errorCode", hasError ? normalizeErrorCode(error) : null);
         model.addAttribute("logout", logout != null);
+
+        // ENABLED プロバイダーを registrationId 付きで提示する。
+        // TenantResolverFilter がホストからテナントを解決済み。
+        List<TenantOidcProviderChoiceView> providers = resolveProviders();
+        model.addAttribute("providers", providers);
+
         return "tenant/login";
+    }
+
+    /**
+     * 現リクエストのテナントの ENABLED プロバイダー選択肢を取得する。
+     *
+     * <p>TenantContext が未解決の場合は空リストを返す（画面側で「プロバイダーなし」を表示）。</p>
+     *
+     * @return プロバイダー選択肢のリスト
+     */
+    private List<TenantOidcProviderChoiceView> resolveProviders() {
+        Tenant tenant = TenantContext.current();
+        if (tenant == null) {
+            return List.of();
+        }
+        return tenantOidcProviderService.findEnabledChoicesByTenantId(tenant.getTenantId());
     }
 
     /**

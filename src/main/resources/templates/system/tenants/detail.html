@@ -236,7 +236,7 @@
                             </thead>
                             <tbody>
                                 <tr th:each="host : ${tenant.hosts}"
-                                    th:with="loginUrl=${loginUrlScheme + '://' + host.host + '/t/' + tenant.slug + '/login'}">
+                                    th:with="loginUrl=${loginUrlScheme + '://' + host.host + '/login'}">
                                     <td>
                                         <code th:text="${host.host}">example.com</code>
                                     </td>

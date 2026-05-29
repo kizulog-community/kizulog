@@ -11,6 +11,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.OAuth2Error;
 
+import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.exception.TenantInvitationError;
 import io.github.kizulog_community.kizulog.domain.tenantauth.exception.TenantAuthenticationErrorType;
 
 /**
@@ -105,6 +106,48 @@ class TenantAuthenticationFailureHandlerTest {
 
         assertThat(response.getRedirectedUrl())
                 .isEqualTo("/login?error=CODE+WITH+SPACE");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: IDENTITY_EXISTS は /admin-invite/error?code=IDENTITY_EXISTS へ")
+    void onFailure_identityExists_redirectsToInviteError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(TenantInvitationError.IDENTITY_EXISTS.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/admin-invite/error?code=IDENTITY_EXISTS");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: TENANT_MISMATCH は /admin-invite/error?code=TENANT_MISMATCH へ")
+    void onFailure_tenantMismatch_redirectsToInviteError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(TenantInvitationError.TENANT_MISMATCH.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/admin-invite/error?code=TENANT_MISMATCH");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: INVITATION_NOT_FOUND は /admin-invite/error?code=INVITATION_NOT_FOUND へ")
+    void onFailure_invitationNotFound_redirectsToInviteError() throws Exception {
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(TenantInvitationError.INVITATION_NOT_FOUND.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/admin-invite/error?code=INVITATION_NOT_FOUND");
+    }
+
+    @Test
+    @DisplayName("onAuthenticationFailure: 受諾エラーもcontextPathがprefixされる")
+    void onFailure_inviteError_withContextPath_prefixesPath() throws Exception {
+        request.setContextPath("/app");
+
+        handler.onAuthenticationFailure(request, response,
+                oauthExceptionWithCode(TenantInvitationError.IDENTITY_EXISTS.name()));
+
+        assertThat(response.getRedirectedUrl())
+                .isEqualTo("/app/admin-invite/error?code=IDENTITY_EXISTS");
     }
 
 }

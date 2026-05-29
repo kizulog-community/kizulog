@@ -23,11 +23,13 @@ import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOid
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.DecryptedTenantOidcProvider;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.EnabledTenantOidcProviderView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderChoiceView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderDetailView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderListItemView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderStatus;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderStatusHistoryEntry;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderStatusValue;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcRegistrationId;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.port.TenantOidcProviderRepository;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.port.TenantOidcProviderStatusRepository;
 import lombok.RequiredArgsConstructor;
@@ -179,6 +181,26 @@ public class TenantOidcProviderService {
 
         result.sort(Comparator.comparing(EnabledTenantOidcProviderView::getDisplayName));
         return result;
+    }
+
+    /**
+     * テナントの ENABLED プロバイダー一覧を、registrationId 付きの選択肢ビューで取得する。
+     *
+     * @param tenantId テナントID
+     * @return registrationId 付き選択肢のリスト（display_name 昇順）
+     */
+    @Transactional(readOnly = true)
+    public List<TenantOidcProviderChoiceView> findEnabledChoicesByTenantId(String tenantId) {
+        List<EnabledTenantOidcProviderView> enabled = findAllEnabledByTenantId(tenantId);
+
+        List<TenantOidcProviderChoiceView> choices = new ArrayList<>();
+        for (EnabledTenantOidcProviderView v : enabled) {
+            String registrationId =
+                    TenantOidcRegistrationId.of(tenantId, v.getProviderId()).value();
+            choices.add(new TenantOidcProviderChoiceView(
+                    registrationId, v.getDisplayName()));
+        }
+        return choices;
     }
 
     /**

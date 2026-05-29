@@ -63,13 +63,23 @@
                 Sign in with your OIDC provider to access your tenant.
             </p>
 
-            <!--
-              プロバイダー選択UIはG.5で実装予定。
-              ENABLEDなテナントOIDCプロバイダーを一覧表示し、各providerについて
-              /oauth2/authorization/tenant-{tenantId}-{providerId} へのリンクを生成する。
-            -->
-            <div class="text-center text-muted small fst-italic" th:text="#{tenant.login.providers.placeholder}">
-                Login providers will be displayed here.
+            <!-- プロバイダー選択ボタン（ENABLED 全プロバイダー） -->
+            <div th:if="${not #lists.isEmpty(providers)}" class="d-grid gap-2">
+                <a th:each="p : ${providers}"
+                   th:href="@{'/oauth2/authorization/' + ${p.registrationId}}"
+                   class="btn btn-primary btn-login">
+                    <i class="bi bi-box-arrow-in-right me-2"></i>
+                    <span th:text="${p.displayName}">Provider Name</span>
+                </a>
+            </div>
+
+            <!-- プロバイダー0件時の表示 -->
+            <div th:if="${#lists.isEmpty(providers)}"
+                 class="alert alert-warning small mb-0 text-center" role="alert">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>
+                <span th:text="#{tenant.login.providers.none}">
+                    現在利用可能なログインプロバイダーがありません。管理者にお問い合わせください。
+                </span>
             </div>
         </div>
     </div>

@@ -29,24 +29,24 @@ class TenantAuthenticationSuccessHandlerTest {
     }
 
     @Test
-    @DisplayName("onAuthenticationSuccess: SavedRequestがない場合はテナントトップ / へ遷移")
-    void onSuccess_withoutSavedRequest_redirectsToRoot() throws Exception {
+    @DisplayName("onAuthenticationSuccess: SavedRequestがない場合はダッシュボード /dashboard へ遷移")
+    void onSuccess_withoutSavedRequest_redirectsToDashboard() throws Exception {
         Authentication auth = new TestingAuthenticationToken("user", "creds");
 
         handler.onAuthenticationSuccess(request, response, auth);
 
-        assertThat(response.getRedirectedUrl()).isEqualTo("/");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/dashboard");
     }
 
     @Test
-    @DisplayName("onAuthenticationSuccess: contextPathがある場合は / 相対で遷移する")
-    void onSuccess_withContextPath_redirectsToContextRoot() throws Exception {
+    @DisplayName("onAuthenticationSuccess: contextPathがある場合は /dashboard 相対で遷移する")
+    void onSuccess_withContextPath_redirectsToContextDashboard() throws Exception {
         request.setContextPath("/app");
         Authentication auth = new TestingAuthenticationToken("user", "creds");
 
         handler.onAuthenticationSuccess(request, response, auth);
 
-        assertThat(response.getRedirectedUrl()).isEqualTo("/app/");
+        assertThat(response.getRedirectedUrl()).isEqualTo("/app/dashboard");
     }
 
 }
