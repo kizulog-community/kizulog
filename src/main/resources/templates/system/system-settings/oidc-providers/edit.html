@@ -168,6 +168,96 @@
                         </div>
                     </div>
 
+                    <!-- T.0: クレームマッピング設定 -->
+                    <div class="card mb-3">
+                        <div class="card-header bg-light">
+                            <h6 class="mb-0">
+                                <i class="bi bi-diagram-2 me-2"></i>
+                                <span th:text="#{system.oidcProviders.claimsMapping.title}">クレームマッピング設定</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+
+                            <p class="text-muted small mb-3"
+                               th:text="#{system.oidcProviders.claimsMapping.description}">
+                                OIDC プロバイダから取得するユーザ属性のクレームキーを設定します。
+                            </p>
+
+                            <!-- 現在のセッションクレーム情報（アコーディオン） -->
+                            <div class="mb-3"
+                                 th:if="${currentSessionClaims != null and not #maps.isEmpty(currentSessionClaims)}">
+                                <button type="button"
+                                        class="btn btn-sm btn-outline-info"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#currentClaimsAccordion"
+                                        aria-expanded="false">
+                                    <i class="bi bi-info-circle me-1"></i>
+                                    <span th:text="#{system.oidcProviders.claimsMapping.currentClaims.button}">現在のセッションのクレーム情報を確認</span>
+                                </button>
+                                <div id="currentClaimsAccordion" class="collapse mt-2">
+                                    <div class="alert alert-info py-2 mb-0">
+                                        <p class="small mb-2"
+                                           th:text="#{system.oidcProviders.claimsMapping.currentClaims.note}">
+                                            ※ 以下は現在ログイン中のクレーム情報です。設定中のプロバイダ以外で取得した可能性があります。
+                                        </p>
+                                        <table class="table table-sm table-borderless mb-0">
+                                            <tbody>
+                                                <tr th:each="entry : ${currentSessionClaims}">
+                                                    <td class="text-muted small fw-bold" style="width: 30%"
+                                                        th:text="${entry.key}">claimKey</td>
+                                                    <td class="small"
+                                                        th:text="${entry.value}">claimValue</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- マッピング設定（5項目、ハイブリッド: input + datalist） -->
+                            <div class="mb-4" th:each="target : ${claimsMappingTargets}">
+                                <label class="form-label fw-semibold"
+                                       th:for="${'claimsMapping_' + target.key}">
+                                    <span th:text="#{|system.oidcProviders.claimsMapping.target.${target.key}|}">姓</span>
+                                    <span class="text-muted small fw-normal"
+                                          th:text="|(${target.key})|">(familyName)</span>
+                                </label>
+                                <input type="text"
+                                       th:id="${'claimsMapping_' + target.key}"
+                                       th:field="*{claimsMapping[__${target.key}__]}"
+                                       class="form-control"
+                                       th:list="${'claimsMapping_list_' + target.key}"
+                                       th:placeholder="${target.defaultClaimName}"
+                                       autocomplete="off"
+                                       maxlength="100" />
+                                <datalist th:id="${'claimsMapping_list_' + target.key}"
+                                          th:if="${currentSessionClaims != null}">
+                                    <option th:each="claimKey : ${currentSessionClaims.keySet()}"
+                                            th:value="${claimKey}"></option>
+                                </datalist>
+                                <div class="form-text small">
+                                    <i class="bi bi-lightbulb text-warning me-1"></i>
+                                    <span th:text="#{system.oidcProviders.claimsMapping.hint.default}">OIDC標準名:</span>
+                                    <code th:text="${target.defaultClaimName}">family_name</code>
+                                    <span class="text-muted ms-2"
+                                          th:if="${currentSessionClaims != null and not #maps.isEmpty(currentSessionClaims)}"
+                                          th:text="#{system.oidcProviders.claimsMapping.hint.dropdownArrow}">
+                                        ▼ で取得済みクレームから選択可
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- 注意書き -->
+                            <div class="alert alert-light border small mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <span th:text="#{system.oidcProviders.claimsMapping.help.unmapped}">
+                                    空欄にすると「マッピングしない」となり、当該属性は取得されません。
+                                </span>
+                            </div>
+
+                        </div>
+                    </div>
+
                     <!-- 接続確認エリア -->
                     <div class="card mb-3">
                         <div class="card-body">
@@ -221,6 +311,9 @@
         </div>
     </div>
 
+    <!-- 共通フッタ（S.0シリーズで追加） -->
+    <footer th:replace="~{system/fragments/layout :: footer}"></footer>
+
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
 
     <!-- 接続確認用スクリプト -->
@@ -245,10 +338,16 @@
             const resultArea = document.getElementById('testConnectionResult');
             const submitBtn = document.getElementById('submitBtn');
 
-            // 編集画面は display_name / client_id / client_secret のみ変更可
+            // 編集画面は display_name / client_id / client_secret + claimsMapping 変更可
             // 接続確認結果のリセットは編集可能項目変更時のみ
-            const editableInputs = ['displayName', 'clientId', 'clientSecret']
-                    .map(id => document.getElementById(id));
+            const editableIds = ['displayName', 'clientId', 'clientSecret'];
+            const editableInputs = editableIds
+                    .map(id => document.getElementById(id))
+                    .filter(el => el != null);
+
+            // claimsMappingの各入力フィールドにもイベントを設定
+            const claimsMappingInputs = document.querySelectorAll('[id^="claimsMapping_"]');
+            claimsMappingInputs.forEach(input => editableInputs.push(input));
 
             editableInputs.forEach(input => {
                 if (!input) return;

@@ -113,6 +113,103 @@
                 </div>
             </div>
 
+            <!-- ============================================================ -->
+            <!-- T.0シリーズ: 連携Identity一覧 + クレーム連携情報セクション    -->
+            <!-- ============================================================ -->
+            <div class="card mb-3">
+                <div class="card-header bg-light">
+                    <i class="bi bi-link-45deg me-1"></i>
+                    <span th:text="#{system.accounts.detail.section.identities}">連携Identity一覧</span>
+                </div>
+                <div class="card-body">
+
+                    <!-- 0件 -->
+                    <p th:if="${#lists.isEmpty(identitiesView)}" class="text-muted mb-0">
+                        <i class="bi bi-dash-circle me-1"></i>
+                        <span th:text="#{system.accounts.detail.identities.empty}">
+                            連携されているIdentityはありません。
+                        </span>
+                    </p>
+
+                    <!-- 1件以上: identityごとに行表示 -->
+                    <div th:if="${not #lists.isEmpty(identitiesView)}">
+                        <div th:each="identity, iterStat : ${identitiesView}"
+                             class="border rounded p-3 mb-3"
+                             th:classappend="${iterStat.last} ? 'mb-0' : ''">
+
+                            <!-- OIDC接続情報 -->
+                            <h6 class="text-muted small fw-semibold mb-2">
+                                <i class="bi bi-key me-1"></i>
+                                <span th:text="#{system.accounts.detail.identities.section.connection}">OIDC接続情報</span>
+                            </h6>
+                            <dl class="row mb-3 small">
+                                <dt class="col-sm-3 text-muted"
+                                    th:text="#{system.accounts.detail.identities.field.provider}">プロバイダー</dt>
+                                <dd class="col-sm-9 mb-2">
+                                    <span th:if="${identity.providerDisplayName != null}"
+                                          th:text="${identity.providerDisplayName}">Keycloak</span>
+                                    <span th:if="${identity.providerDisplayName == null}"
+                                          class="text-muted small">
+                                        <i class="bi bi-exclamation-circle me-1"></i>
+                                        <span th:text="#{system.accounts.detail.identities.note.providerUnknown}">
+                                            未登録プロバイダー
+                                        </span>
+                                    </span>
+                                </dd>
+
+                                <dt class="col-sm-3 text-muted"
+                                    th:text="#{system.accounts.detail.identities.field.iss}">Issuer</dt>
+                                <dd class="col-sm-9 mb-2">
+                                    <code class="text-break"
+                                          th:text="${identity.iss}">https://auth/realm</code>
+                                </dd>
+
+                                <dt class="col-sm-3 text-muted"
+                                    th:text="#{system.accounts.detail.identities.field.aud}">Audience</dt>
+                                <dd class="col-sm-9 mb-2">
+                                    <code th:text="${identity.aud}">client-id</code>
+                                </dd>
+
+                                <dt class="col-sm-3 text-muted"
+                                    th:text="#{system.accounts.detail.identities.field.sub}">Subject</dt>
+                                <dd class="col-sm-9 mb-0">
+                                    <code class="text-break"
+                                          th:text="${identity.sub}">user-uuid</code>
+                                </dd>
+                            </dl>
+
+                            <hr class="my-3">
+
+                            <!-- クレーム連携情報（T.0: 表示用List直接参照に単純化） -->
+                            <h6 class="text-muted small fw-semibold mb-2">
+                                <i class="bi bi-person-vcard me-1"></i>
+                                <span th:text="#{system.accounts.detail.identities.section.claims}">クレーム連携情報</span>
+                            </h6>
+
+                            <!-- クレーム情報が空の場合 -->
+                            <p th:if="${#lists.isEmpty(identity.claimsDisplay)}"
+                               class="text-muted small mb-0">
+                                <i class="bi bi-dash-circle me-1"></i>
+                                <span th:text="#{system.accounts.detail.identities.claims.empty}">
+                                    取得できたクレーム情報はありません
+                                </span>
+                            </p>
+
+                            <!-- クレーム情報がある場合 -->
+                            <dl th:unless="${#lists.isEmpty(identity.claimsDisplay)}"
+                                class="row mb-0 small">
+                                <th:block th:each="entry : ${identity.claimsDisplay}">
+                                    <dt class="col-sm-3 text-muted"
+                                        th:text="${entry.label}">姓</dt>
+                                    <dd class="col-sm-9 mb-2"
+                                        th:text="${entry.value}">山田</dd>
+                                </th:block>
+                            </dl>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- ステータス変更操作 -->
             <div class="card mb-3">
                 <div class="card-header bg-light">
@@ -302,6 +399,9 @@
         </main>
     </div>
 </div>
+
+<!-- 共通フッタ（S.0シリーズで追加） -->
+<footer th:replace="~{system/fragments/layout :: footer}"></footer>
 
 <script th:replace="~{system/fragments/layout :: scripts}"></script>
 

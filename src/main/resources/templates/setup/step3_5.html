@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>KizuLog</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body { background-color: #f8f9fa; }
+        .setup-card { max-width: 720px; margin: 60px auto; }
+        .step { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.875rem; }
+        .step.active { background-color: #0d6efd; color: white; }
+        .step.done { background-color: #198754; color: white; }
+        .step.todo { background-color: #dee2e6; color: #6c757d; }
+        .step-line { flex: 1; height: 2px; background-color: #dee2e6; margin: 0 8px; }
+        .claims-table { font-size: 0.875rem; }
+        .claims-table td { vertical-align: top; padding: 0.4rem 0.5rem; }
+        .claims-table .claim-key { width: 30%; font-weight: 600; color: #495057; word-break: break-all; }
+        .claims-table .claim-value { color: #212529; word-break: break-all; }
+    </style>
+</head>
+<body>
+<div class="setup-card px-3">
+    <div class="text-center mb-4">
+        <h1 class="h3 fw-bold text-primary">
+            <i class="bi bi-shield-lock-fill me-2"></i><span th:text="#{setup.title}"></span>
+        </h1>
+        <p class="text-muted mb-0" th:text="#{setup.subtitle}"></p>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-center mb-4">
+        <div class="step done"><i class="bi bi-check"></i></div>
+        <div class="step-line"></div>
+        <div class="step done"><i class="bi bi-check"></i></div>
+        <div class="step-line"></div>
+        <div class="step done"><i class="bi bi-check"></i></div>
+        <div class="step-line"></div>
+        <div class="step active">3</div>
+        <div class="step-line"></div>
+        <div class="step todo">4</div>
+    </div>
+
+    <div class="card shadow-sm">
+        <div class="card-body p-4">
+            <h5 class="card-title mb-1" th:text="#{setup.step3_5.title}">クレームマッピング設定</h5>
+            <p class="text-muted small mb-4" th:text="#{setup.step3_5.description}">
+                OIDC プロバイダから取得するユーザ属性とクレームキーの対応関係を設定します。
+            </p>
+
+            <form th:action="@{/setup/step3-5}"
+                  th:object="${step3_5FormData}"
+                  method="post"
+                  novalidate>
+
+                <!-- 現在のセッションクレーム情報（アコーディオン） -->
+                <div class="mb-4"
+                     th:if="${currentClaims != null and not #maps.isEmpty(currentClaims)}">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-info"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#currentClaimsAccordion"
+                            aria-expanded="false">
+                        <i class="bi bi-info-circle me-1"></i>
+                        <span th:text="#{setup.step3_5.currentClaims.button}">現在のログインで取得できたクレームを確認</span>
+                    </button>
+                    <div id="currentClaimsAccordion" class="collapse mt-2">
+                        <div class="alert alert-info py-2 mb-0">
+                            <p class="small mb-2"
+                               th:text="#{setup.step3_5.currentClaims.note}">
+                                ※ 以下はOIDCログインで取得できたクレーム情報です。入力欄で補完候補として利用できます。
+                            </p>
+                            <table class="table table-sm table-borderless mb-0 claims-table">
+                                <tbody>
+                                    <tr th:each="entry : ${currentClaims}">
+                                        <td class="claim-key" th:text="${entry.key}">claimKey</td>
+                                        <td class="claim-value" th:text="${entry.value}">claimValue</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- マッピング設定（5項目、ハイブリッド: input + datalist） -->
+                <div class="mb-4" th:each="target : ${claimsMappingTargets}">
+                    <label class="form-label fw-semibold"
+                           th:for="${'claimsMapping_' + target.key}">
+                        <span th:text="#{|setup.step3_5.target.${target.key}|}">姓</span>
+                        <span class="text-muted small fw-normal"
+                              th:text="|(${target.key})|">(familyName)</span>
+                    </label>
+                    <input type="text"
+                           th:id="${'claimsMapping_' + target.key}"
+                           th:field="*{claimsMapping[__${target.key}__]}"
+                           class="form-control"
+                           th:list="${'claimsMapping_list_' + target.key}"
+                           th:placeholder="${target.defaultClaimName}"
+                           autocomplete="off"
+                           maxlength="100" />
+                    <datalist th:id="${'claimsMapping_list_' + target.key}"
+                              th:if="${currentClaims != null}">
+                        <option th:each="claimKey : ${currentClaims.keySet()}"
+                                th:value="${claimKey}"></option>
+                    </datalist>
+                    <div class="form-text small">
+                        <i class="bi bi-lightbulb text-warning me-1"></i>
+                        <span th:text="#{setup.step3_5.hint.default}">OIDC標準名:</span>
+                        <code th:text="${target.defaultClaimName}">family_name</code>
+                        <span class="text-muted ms-2" th:text="#{setup.step3_5.hint.dropdownArrow}">
+                            ▼ で取得済みクレームから選択可
+                        </span>
+                    </div>
+                </div>
+
+                <!-- 注意書き -->
+                <div class="alert alert-light border small mb-4">
+                    <i class="bi bi-info-circle me-1"></i>
+                    <span th:text="#{setup.step3_5.help.unmapped}">
+                        空欄にすると「マッピングしない」となり、当該属性は取得されません。
+                    </span>
+                </div>
+
+                <div class="d-flex justify-content-between">
+                    <a th:href="@{/setup/step3}" class="btn btn-outline-secondary px-4">
+                        <i class="bi bi-arrow-left me-1"></i>
+                        <span th:text="#{setup.button.back}">戻る</span>
+                    </a>
+                    <button type="submit" class="btn btn-primary px-4">
+                        <span th:text="#{setup.button.next}">次へ</span>
+                        <i class="bi bi-arrow-right ms-1"></i>
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+</div>
+<!-- 共通フッタ（S.0シリーズで追加） -->
+<footer th:replace="~{common/fragments/footer :: footer}"></footer>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

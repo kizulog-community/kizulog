@@ -58,6 +58,7 @@ public class SystemOidcProviderRepositoryImpl implements SystemOidcProviderRepos
                 entity.getUri(),
                 entity.getClientId(),
                 entity.getClientSecret(),
+                entity.getClaimsMapping(),
                 entity.getCreatedAt(),
                 entity.getCreatedBy());
     }
@@ -71,6 +72,7 @@ public class SystemOidcProviderRepositoryImpl implements SystemOidcProviderRepos
                 domain.getUri(),
                 domain.getClientId(),
                 domain.getClientSecret(),
+                domain.getClaimsMapping(),
                 domain.getCreatedAt(),
                 domain.getCreatedBy());
     }

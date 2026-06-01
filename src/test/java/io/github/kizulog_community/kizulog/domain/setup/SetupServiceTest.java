@@ -123,8 +123,9 @@ class SetupServiceTest {
                 eq("https://auth.example.com/realms/master"),
                 eq("kizulog-client"),
                 eq("plain-secret"),
+                any(),                                          // claimsMapping (T.0: デフォルトマッピング)
                 eq(OidcProviderStatusValue.ENABLED),
-                any(),
+                any(),                                          // version
                 eq("system:setup-wizard"));
     }
 
@@ -178,7 +179,7 @@ class SetupServiceTest {
                 ArgumentCaptor.forClass(OffsetDateTime.class);
 
         verify(systemOidcProviderService).register(
-                any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(),
                 oidcVersionCaptor.capture(),
                 any());
         verify(localizationSettingService).saveBoth(

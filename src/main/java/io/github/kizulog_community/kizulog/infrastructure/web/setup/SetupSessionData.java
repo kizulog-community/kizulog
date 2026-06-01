@@ -2,7 +2,9 @@ package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.annotation.SessionScope;
@@ -31,7 +33,7 @@ public class SetupSessionData implements Serializable {
     /** セットアップ言語 */
     private SupportedLanguage setupLanguage;
 
-/** OIDC設定リスト */
+    /** OIDC設定リスト */
     private List<OidcSetting> oidcSettings = new ArrayList<>();
 
     /** デフォルト言語 */
@@ -57,5 +59,8 @@ public class SetupSessionData implements Serializable {
 
     /** 初期管理者のsub */
     private String adminSub;
+
+    /** 初期管理者のOIDCクレーム情報 */
+    private Map<String, Object> adminClaims = new LinkedHashMap<>();
 
 }

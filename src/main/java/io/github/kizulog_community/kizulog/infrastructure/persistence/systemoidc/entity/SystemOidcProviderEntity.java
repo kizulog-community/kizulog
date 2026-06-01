@@ -1,6 +1,10 @@
 package io.github.kizulog_community.kizulog.infrastructure.persistence.systemoidc.entity;
 
 import java.time.OffsetDateTime;
+import java.util.Map;
+
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.EmbeddedId;
@@ -36,6 +40,10 @@ public class SystemOidcProviderEntity {
 
     @Column(name = "client_secret", nullable = false)
     private String clientSecret;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "claims_mapping", nullable = false, columnDefinition = "jsonb")
+    private Map<String, String> claimsMapping;
 
     @Column(name = "created_at", nullable = false)
     private OffsetDateTime createdAt;

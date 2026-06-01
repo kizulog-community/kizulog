@@ -48,30 +48,11 @@
                 </div>
 
                 <!-- ============================================================ -->
-                <!-- ログインアカウント情報カード                                  -->
+                <!-- T.0シリーズで「ログインアカウント情報」セクションを削除      -->
+                <!-- iss/aud/sub と OIDCクレーム連携情報はプロフィール設定画面の  -->
+                <!-- 連携OIDCプロバイダー一覧に集約。セキュリティ上、ダッシュボード -->
+                <!-- には認証メタ情報を表示しない方針。                            -->
                 <!-- ============================================================ -->
-                <div class="card mb-4">
-                    <div class="card-body">
-                        <h5 class="card-title">
-                            <i class="bi bi-person-badge me-2 text-primary"></i>
-                            <span th:text="#{system.dashboard.account.title}">ログインアカウント情報</span>
-                        </h5>
-                        <dl class="row mb-0 small">
-                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.iss}">Issuer</dt>
-                            <dd class="col-sm-9">
-                                <code th:text="${principal != null ? principal.iss : ''}">-</code>
-                            </dd>
-                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.aud}">Audience</dt>
-                            <dd class="col-sm-9">
-                                <code th:text="${principal != null ? principal.aud : ''}">-</code>
-                            </dd>
-                            <dt class="col-sm-3 text-muted" th:text="#{system.dashboard.account.sub}">Subject</dt>
-                            <dd class="col-sm-9">
-                                <code th:text="${principal != null ? principal.sub : ''}">-</code>
-                            </dd>
-                        </dl>
-                    </div>
-                </div>
 
                 <!-- ============================================================ -->
                 <!-- クイックリンク（管理機能カード）                              -->
@@ -144,6 +125,9 @@
 
         </div>
     </div>
+
+    <!-- 共通フッタ（S.0シリーズで追加） -->
+    <footer th:replace="~{system/fragments/layout :: footer}"></footer>
 
     <!-- 共通scripts -->
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>

@@ -26,6 +26,76 @@
                     あなた自身の利用設定を管理します。
                 </p>
 
+                <!-- ============================================================ -->
+                <!-- T.0仕様変更: あなたの情報セクション                          -->
+                <!-- ============================================================ -->
+                <div class="card mb-4">
+                    <div class="card-header bg-light">
+                        <i class="bi bi-person-circle me-1"></i>
+                        <span th:text="#{system.my-profile.section.myInfo}">あなたの情報</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-3">
+                            <!-- 左カラム: プロフィール（クレーム情報） -->
+                            <div class="col-md-6">
+                                <h6 class="text-muted small fw-semibold mb-2">
+                                    <i class="bi bi-person-vcard me-1"></i>
+                                    <span th:text="#{system.my-profile.section.myInfo.profile}">プロフィール</span>
+                                </h6>
+
+                                <!-- クレーム情報が空の場合 -->
+                                <p th:if="${#lists.isEmpty(myClaimsDisplay)}"
+                                   class="text-muted small mb-0">
+                                    <i class="bi bi-dash-circle me-1"></i>
+                                    <span th:text="#{system.my-profile.section.myInfo.claims.empty}">
+                                        取得できたプロフィール情報はありません
+                                    </span>
+                                </p>
+
+                                <!-- クレーム情報がある場合 -->
+                                <dl th:unless="${#lists.isEmpty(myClaimsDisplay)}"
+                                    class="row mb-0 small">
+                                    <th:block th:each="entry : ${myClaimsDisplay}">
+                                        <dt class="col-sm-4 text-muted"
+                                            th:text="${entry.label}">姓</dt>
+                                        <dd class="col-sm-8 mb-2"
+                                            th:text="${entry.value}">山田</dd>
+                                    </th:block>
+                                </dl>
+                            </div>
+
+                            <!-- 右カラム: ログイン中Identity 接続情報 -->
+                            <div class="col-md-6">
+                                <h6 class="text-muted small fw-semibold mb-2">
+                                    <i class="bi bi-key me-1"></i>
+                                    <span th:text="#{system.my-profile.section.myInfo.connection}">ログイン中Identity</span>
+                                </h6>
+                                <dl class="row mb-0 small">
+                                    <dt class="col-sm-4 text-muted"
+                                        th:text="#{system.my-profile.section.myInfo.iss}">Issuer</dt>
+                                    <dd class="col-sm-8 mb-2">
+                                        <code class="text-break"
+                                              th:text="${myIss != null ? myIss : '-'}">https://auth/realm</code>
+                                    </dd>
+
+                                    <dt class="col-sm-4 text-muted"
+                                        th:text="#{system.my-profile.section.myInfo.aud}">Audience</dt>
+                                    <dd class="col-sm-8 mb-2">
+                                        <code th:text="${myAud != null ? myAud : '-'}">client-id</code>
+                                    </dd>
+
+                                    <dt class="col-sm-4 text-muted"
+                                        th:text="#{system.my-profile.section.myInfo.sub}">Subject</dt>
+                                    <dd class="col-sm-8 mb-0">
+                                        <code class="text-break"
+                                              th:text="${mySub != null ? mySub : '-'}">user-uuid</code>
+                                    </dd>
+                                </dl>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 設定カードリスト -->
                 <div class="row g-3">
 
@@ -80,7 +150,6 @@
         </div>
     </div>
 
-    <!-- ページ固有のスタイル（system-settingsと同じパターン） -->
     <style>
         .myprofile-card {
             border: 1px solid #dee2e6;
@@ -102,6 +171,9 @@
             flex-shrink: 0;
         }
     </style>
+
+    <!-- 共通フッタ -->
+    <footer th:replace="~{system/fragments/layout :: footer}"></footer>
 
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
 

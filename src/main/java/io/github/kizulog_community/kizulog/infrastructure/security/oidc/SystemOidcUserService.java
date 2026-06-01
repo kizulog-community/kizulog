@@ -16,6 +16,7 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.exception.Identi
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountIdentityLinkService;
+import io.github.kizulog_community.kizulog.domain.systemaccountprofile.service.SystemAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.InvitationAcceptanceService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.SystemAdminInvitationService;
@@ -27,36 +28,6 @@ import io.github.kizulog_community.kizulog.infrastructure.web.system.myprofile.I
 
 /**
  * システム管理者OIDCユーザーサービス
- *
- * <p>Spring Securityの OAuth2UserService 実装。
- * OIDCプロバイダーから検証済みID Token・UserInfoを取得した後、
- * KizuLogのシステム管理アカウント情報と突合して認証を完了させる。</p>
- *
- * <p>処理の流れ:
- * <ol>
- * <li>Spring標準の OidcUserService にデリゲートしてID Token検証・UserInfo取得</li>
- * <li>ID Tokenから iss/sub + ClientRegistrationから aud を抽出</li>
- * <li>セッションの状態に応じて3分岐:
- * <ul>
- * <li>招待pending → 招待受諾フロー（新規account+identity+role作成）</li>
- * <li>identityリンクpending → 既存accountへのidentity追加フロー</li>
- * <li>それ以外 → 通常ログインフロー（既存identityで認証）</li>
- * </ul>
- * </li>
- * <li>SystemUserPrincipalを生成してSpring Securityに返却</li>
- * </ol>
- * 認証失敗時は OAuth2AuthenticationException に変換して投げる。</p>
- *
- * <p>identityリンクフロー詳細:
- * セッションのIdentityLinkSessionがpending状態の場合、
- * 1. SystemAccountIdentityLinkServiceで重複チェックを伴って新規identityを作成し、
- * 2. 作成済みidentityで SystemUserPrincipal を生成して返す。
- * セッション状態は必ずクリアする。</p>
- *
- * <p>audの取得についての注釈:
- * Spring SecurityのOidcIdTokenValidatorはID Tokenのaudクレームに
- * ClientRegistrationのclientIdが含まれることを標準で検証する。
- * よって clientRegistration.getClientId() を aud として使う。</p>
  *
  * @author Jun Kobayashi
  */
@@ -87,19 +58,17 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
     /** identityリンクセッション(sessionスコープProxy Bean) */
     private final IdentityLinkSession identityLinkSession;
 
+    /** OIDCクレームフィルタ（ホワイトリスト） */
+    private final OidcClaimsFilter claimsFilter;
+
+    /** プロファイルキャッシュService */
+    private final SystemAccountProfileService profileService;
+
     /** Spring標準のOidcUserService（デリゲート） */
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
 
     /**
      * 本番用コンストラクタ
-     *
-     * @param systemAuthenticationService ドメイン認証サービス
-     * @param systemAccountIdentityRepository identityリポジトリ
-     * @param invitationAcceptanceService 招待受諾オーケストレーションサービス
-     * @param invitationService 招待管理サービス
-     * @param identityLinkService identityリンクサービス
-     * @param invitationSession 招待セッション
-     * @param identityLinkSession identityリンクセッション
      */
     @Autowired
     public SystemOidcUserService(
@@ -109,7 +78,9 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAdminInvitationService invitationService,
             SystemAccountIdentityLinkService identityLinkService,
             InvitationAcceptanceSession invitationSession,
-            IdentityLinkSession identityLinkSession) {
+            IdentityLinkSession identityLinkSession,
+            OidcClaimsFilter claimsFilter,
+            SystemAccountProfileService profileService) {
         this(
                 systemAuthenticationService,
                 systemAccountIdentityRepository,
@@ -118,13 +89,13 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
                 identityLinkService,
                 invitationSession,
                 identityLinkSession,
+                claimsFilter,
+                profileService,
                 new OidcUserService());
     }
 
     /**
      * テスト用コンストラクタ（パッケージプライベート）
-     *
-     * <p>delegateをモックに差し替え可能にするための入口。</p>
      */
     SystemOidcUserService(
             SystemAuthenticationService systemAuthenticationService,
@@ -134,6 +105,8 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAccountIdentityLinkService identityLinkService,
             InvitationAcceptanceSession invitationSession,
             IdentityLinkSession identityLinkSession,
+            OidcClaimsFilter claimsFilter,
+            SystemAccountProfileService profileService,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.systemAuthenticationService = systemAuthenticationService;
         this.systemAccountIdentityRepository = systemAccountIdentityRepository;
@@ -142,20 +115,17 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
         this.identityLinkService = identityLinkService;
         this.invitationSession = invitationSession;
         this.identityLinkSession = identityLinkSession;
+        this.claimsFilter = claimsFilter;
+        this.profileService = profileService;
         this.delegate = delegate;
     }
 
     /**
      * OIDC認証コールバック処理。
-     *
-     * @param userRequest OIDCユーザーリクエスト（ID Token・ClientRegistration含む）
-     * @return KizuLogのシステム管理者を表すSystemUserPrincipal
-     * @throws OAuth2AuthenticationException ID Token取得失敗、または認証失敗時
      */
     @Override
     public OidcUser loadUser(OidcUserRequest userRequest) throws OAuth2AuthenticationException {
         // 1) Spring標準の処理に委譲（ID Token検証・UserInfo取得）
-        //    OAuth2AuthenticationExceptionはそのまま伝播させる
         OidcUser oidcUser = delegate.loadUser(userRequest);
 
         // 2) iss / aud / sub の抽出
@@ -173,7 +143,10 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             identity = handleStandardLoginFlow(iss, aud, sub);
         }
 
-        // 4) SystemUserPrincipalを生成してSpring Securityに返却
+        // 4) R.0: プロファイル更新（fail-open）
+        updateProfileCache(identity, oidcUser, sub);
+
+        // 5) SystemUserPrincipalを生成してSpring Securityに返却
         return SystemUserPrincipal.ofSystemAdmin(
                 identity.getAccountId(),
                 identity.getIdentityId(),
@@ -184,31 +157,37 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
     }
 
     /**
+     * プロファイルキャッシュを更新する。
+     *
+     * @param identity 認証成功したidentity
+     * @param oidcUser OIDCユーザ情報
+     * @param sub createdBy として記録する値
+     */
+    private void updateProfileCache(
+            SystemAccountIdentity identity, OidcUser oidcUser, String sub) {
+        try {
+            var filtered = claimsFilter.filter(oidcUser.getClaims());
+            if (!filtered.isEmpty()) {
+                profileService.upsertIfChanged(identity.getIdentityId(), filtered, sub);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Failed to update profile cache: identityId={}, error={}",
+                    identity.getIdentityId(), e.getMessage());
+        }
+    }
+
+    /**
      * 招待受諾フローの処理。
-     *
-     * <p>iss/aud/subで既存identityを検索し、
-     * <ul>
-     * <li>見つかった場合: 既にKizuLogに登録済の利用者。招待を自動CANCELLED化して
-     *     IDENTITY_EXISTS エラーで認証失敗。受諾者には「既に登録済」を案内する。</li>
-     * <li>見つからない場合: 新規利用者。InvitationAcceptanceServiceで
-     *     account/identity/role 一式を作成し、招待をUSED状態に更新。</li>
-     * </ul>
-     * いずれの場合もセッションのpending情報はクリアする。</p>
-     *
-     * @return 認証成功時のidentity(新規作成 or 既存)
-     * @throws OAuth2AuthenticationException 招待受諾不能な場合
      */
     private SystemAccountIdentity handleInvitationFlow(String iss, String aud, String sub) {
         String invitationId = invitationSession.getInvitationId();
         log.info("招待受諾フロー開始: invitationId={}, iss={}, aud={}, sub={}",
                 invitationId, iss, aud, sub);
 
-        // 既存identityチェック
         var existingOpt = systemAccountIdentityRepository
                 .findLatestByIssAndAudAndSub(iss, aud, sub);
 
         if (existingOpt.isPresent()) {
-            // 既にアカウント保持者 → 招待を自動CANCELLED化
             log.warn("招待受諾フロー: 既存identityあり、招待を自動取消: "
                     + "invitationId={}, existingIdentityId={}",
                     invitationId, existingOpt.get().getIdentityId());
@@ -218,7 +197,6 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
                         "auto-cancelled: identity already exists",
                         "system:auto-cancel");
             } catch (RuntimeException e) {
-                // 同時アクセスで既にCANCELLED/USEDになっていた等
                 log.warn("自動取消に失敗（先行操作の可能性）: {}", e.getMessage());
             }
             invitationSession.clear();
@@ -227,13 +205,11 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
                     "Identity already exists for this account");
         }
 
-        // 新規受諾 → アカウント作成
         SystemAccountIdentity created;
         try {
             created = invitationAcceptanceService.acceptInvitation(
                     invitationId, iss, aud, sub);
         } catch (RuntimeException e) {
-            // 例: 同時アクセスで先にmarkAsUsedされた場合のALREADY_USED
             log.warn("招待受諾の処理中に失敗: invitationId={}, error={}",
                     invitationId, e.getMessage());
             invitationSession.clear();
@@ -249,17 +225,6 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
 
     /**
      * identityリンクフローの処理。
-     *
-     * <p>SystemAccountIdentityLinkService.linkIdentity()で
-     * 重複チェック+identity+identity_status作成を1トランザクションで行う。
-     * 結果のidentityはACTIVE状態で、そのままセッションのprincipalとして利用可能。</p>
-     *
-     * <p>ドメイン例外（IdentityLinkException）は OAuth2AuthenticationException に変換し、
-     * SystemAuthenticationFailureHandler が
-     * {@code /system/my-profile/oidc-links/error?code=...} へリダイレクトする。</p>
-     *
-     * @return 作成されたidentity
-     * @throws OAuth2AuthenticationException リンク不能な場合
      */
     private SystemAccountIdentity handleIdentityLinkFlow(String iss, String aud, String sub) {
         String accountId = identityLinkSession.getTargetAccountId();
@@ -294,15 +259,11 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
 
     /**
      * 通常ログインフローの処理。
-     *
-     * @return 認証成功時のidentity
-     * @throws OAuth2AuthenticationException 認証失敗時
      */
     private SystemAccountIdentity handleStandardLoginFlow(String iss, String aud, String sub) {
         try {
             return systemAuthenticationService.authenticate(iss, aud, sub);
         } catch (SystemAuthenticationException e) {
-            // ドメイン例外をSpring Security例外に変換
             throw new OAuth2AuthenticationException(
                     new OAuth2Error(e.getErrorType().name()), e.getMessage(), e);
         }

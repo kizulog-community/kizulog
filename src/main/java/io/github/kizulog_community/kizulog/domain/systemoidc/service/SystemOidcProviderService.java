@@ -15,6 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingValidator;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.EnabledProviderView;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
@@ -89,11 +91,13 @@ public class SystemOidcProviderService {
             String uri,
             String clientId,
             String plainClientSecret,
+            Map<String, String> claimsMapping,
             OidcProviderStatusValue status,
             OffsetDateTime version,
             String createdBy) {
         String encryptedSecret = cryptoPort.encrypt(plainClientSecret);
         String normalizedUri = normalizeUri(uri);
+        Map<String, String> normalizedMapping = normalizeClaimsMapping(claimsMapping);
 
         providerRepository.save(new SystemOidcProvider(
                 providerId,
@@ -102,6 +106,7 @@ public class SystemOidcProviderService {
                 normalizedUri,
                 clientId,
                 encryptedSecret,
+                normalizedMapping,
                 version,
                 createdBy));
 
@@ -138,6 +143,20 @@ public class SystemOidcProviderService {
     }
 
     /**
+     * クレームマッピングを正規化する。
+     *
+     * @param input 入力マッピング
+     * @return 正規化されたマッピング（必ず非null、定義順）
+     */
+    static Map<String, String> normalizeClaimsMapping(Map<String, String> input) {
+        Map<String, String> normalized = ClaimsMappingValidator.normalize(input);
+        if (ClaimsMappingValidator.isEmpty(normalized)) {
+            return ClaimsMappingTarget.defaultMapping();
+        }
+        return normalized;
+    }
+
+    /**
      * バリデーション付きでOIDCプロバイダーを登録する。
      *
      * @throws OidcProviderException バリデーション失敗時
@@ -149,12 +168,13 @@ public class SystemOidcProviderService {
             String uri,
             String clientId,
             String plainClientSecret,
+            Map<String, String> claimsMapping,
             String createdBy) {
         validateNewProviderId(providerId);
 
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         register(providerId, displayName, uri, clientId, plainClientSecret,
-                OidcProviderStatusValue.ENABLED, now, createdBy);
+                claimsMapping, OidcProviderStatusValue.ENABLED, now, createdBy);
     }
 
     /**
@@ -168,6 +188,7 @@ public class SystemOidcProviderService {
             String displayName,
             String clientId,
             String plainClientSecret,
+            Map<String, String> claimsMapping,
             String updatedBy) {
         SystemOidcProvider current = providerRepository.findLatestByProviderId(providerId)
                 .orElseThrow(() ->
@@ -177,6 +198,11 @@ public class SystemOidcProviderService {
                 ? current.getClientSecret()
                 : cryptoPort.encrypt(plainClientSecret);
 
+        Map<String, String> resolvedMapping = ClaimsMappingValidator.normalize(claimsMapping);
+        if (ClaimsMappingValidator.isEmpty(resolvedMapping)) {
+            resolvedMapping = current.getClaimsMappingCopy();
+        }
+
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         providerRepository.save(new SystemOidcProvider(
                 providerId,
@@ -185,6 +211,7 @@ public class SystemOidcProviderService {
                 current.getUri(),
                 clientId,
                 encryptedSecret,
+                resolvedMapping,
                 now,
                 updatedBy));
     }
@@ -257,7 +284,6 @@ public class SystemOidcProviderService {
             throw new OidcProviderException(OidcProviderError.ALREADY_DISABLED);
         }
 
-        // 「最低1つENABLED」制約: このプロバイダーを除いた他のENABLED一覧が1件以上あること
         if (countOtherEnabled(providerId) == 0) {
             throw new OidcProviderException(OidcProviderError.LAST_ENABLED_REQUIRED);
         }

@@ -1,6 +1,9 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.system.myprofile;
 
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,8 +20,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkError;
 import io.github.kizulog_community.kizulog.domain.systemaccount.exception.IdentityLinkException;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.LinkedIdentityView;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountIdentityLinkService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.IdentityClaimsViewService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import lombok.RequiredArgsConstructor;
 
@@ -56,6 +63,12 @@ public class OidcLinksController {
     /** identityリンクセッション(session-scopedプロキシBean) */
     private final IdentityLinkSession identityLinkSession;
 
+    /** identityリポジトリ（aud取得用） */
+    private final SystemAccountIdentityRepository identityRepository;
+
+    /** Identityクレームビューサービス */
+    private final IdentityClaimsViewService identityClaimsViewService;
+
     /**
      * 連携済みOIDCプロバイダー一覧画面を表示する。
      *
@@ -76,10 +89,31 @@ public class OidcLinksController {
 
         long activeCount = items.stream().filter(LinkedIdentityView::isActive).count();
 
+        // T.0: 各identityの aud とクレーム連携情報を取得
+        Map<String, String> audPerIdentity = new LinkedHashMap<>();
+        Map<String, Map<String, String>> claimsPerIdentity = new LinkedHashMap<>();
+
+        for (LinkedIdentityView item : items) {
+            String identityId = item.getIdentityId();
+
+            // aud は identity テーブルから直接取得
+            Optional<SystemAccountIdentity> identityOpt =
+                    identityRepository.findLatestByIdentityId(identityId);
+            identityOpt.ifPresent(identity ->
+                    audPerIdentity.put(identityId, identity.getAud()));
+
+            // クレーム連携情報を取得（fail-openで空マップになることもある）
+            Map<String, String> claims =
+                    identityClaimsViewService.resolveClaimsView(identityId);
+            claimsPerIdentity.put(identityId, claims);
+        }
+
         model.addAttribute("activeMenu", "my-profile");
         model.addAttribute("items", items);
-        // 「最後の1件は解除不可」のUI判定用
         model.addAttribute("activeCount", activeCount);
+        model.addAttribute("audPerIdentity", audPerIdentity);
+        model.addAttribute("claimsPerIdentity", claimsPerIdentity);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
         return "system/my-profile/oidc-links/list";
     }
 

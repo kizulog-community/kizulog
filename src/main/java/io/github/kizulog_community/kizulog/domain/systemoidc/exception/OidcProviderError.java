@@ -23,6 +23,9 @@ public enum OidcProviderError {
     ALREADY_ENABLED,
 
     /** 既にDISABLED状態（無効化操作時） */
-    ALREADY_DISABLED
+    ALREADY_DISABLED,
+
+    /** クレームマッピング設定が不正 */
+    CLAIMS_MAPPING_INVALID
 
 }

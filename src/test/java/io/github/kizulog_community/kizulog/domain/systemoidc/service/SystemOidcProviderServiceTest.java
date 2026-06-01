@@ -22,6 +22,7 @@ import org.mockito.ArgumentCaptor;
 import io.github.kizulog_community.kizulog.domain.port.CryptoPort;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.EnabledProviderView;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
@@ -60,7 +61,8 @@ class SystemOidcProviderServiceTest {
         return new SystemOidcProvider(
                 id, version, "Display " + id,
                 "https://auth.example/realms/" + id,
-                "client-" + id, secret, version, "user:" + id);
+                "client-" + id, secret,
+                ClaimsMappingTarget.defaultMapping(), version, "user:" + id);
     }
 
     private SystemOidcProviderStatus statusOf(
@@ -213,6 +215,7 @@ class SystemOidcProviderServiceTest {
 
         service.register("master", "Master", "https://auth.example/realms/master",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         verify(providerRepository).save(any(SystemOidcProvider.class));
@@ -226,6 +229,7 @@ class SystemOidcProviderServiceTest {
 
         service.register("master", "Master", "https://auth.example/realms/master",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         verify(cryptoPort).encrypt("plain-secret");
@@ -244,6 +248,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master Display",
                 "https://auth.example/realms/master",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -276,6 +281,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master",
                 "https://auth.example/realms/master/",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -293,6 +299,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master",
                 "  https://auth.example/realms/master  ",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -310,6 +317,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master",
                 "  https://auth.example/realms/master/  ",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -327,6 +335,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master",
                 "https://auth.example/realms/master",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -344,6 +353,7 @@ class SystemOidcProviderServiceTest {
         service.register("master", "Master",
                 "https://AUTH.Example/Realms/Master",
                 "client-1", "plain-secret",
+                ClaimsMappingTarget.defaultMapping(),
                 OidcProviderStatusValue.ENABLED, BASE_TIME, "system:setup");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
@@ -389,7 +399,7 @@ class SystemOidcProviderServiceTest {
 
         service.registerWithValidation("google", "Google",
                 "https://accounts.google.com",
-                "client-g", "plain-secret", "user:admin");
+                "client-g", "plain-secret", null, "user:admin");
 
         verify(providerRepository).save(any(SystemOidcProvider.class));
         verify(statusRepository).save(any(SystemOidcProviderStatus.class));
@@ -401,7 +411,7 @@ class SystemOidcProviderServiceTest {
         assertThatThrownBy(() ->
                 service.registerWithValidation("INVALID", "Invalid",
                         "https://example.com",
-                        "client", "secret", "user"))
+                        "client", "secret", null, "user"))
                 .isInstanceOf(OidcProviderException.class)
                 .extracting("error")
                 .isEqualTo(OidcProviderError.PROVIDER_ID_INVALID_FORMAT);
@@ -418,7 +428,7 @@ class SystemOidcProviderServiceTest {
         assertThatThrownBy(() ->
                 service.registerWithValidation("master", "Master",
                         "https://example.com",
-                        "client", "secret", "user"))
+                        "client", "secret", null, "user"))
                 .isInstanceOf(OidcProviderException.class)
                 .extracting("error")
                 .isEqualTo(OidcProviderError.PROVIDER_ID_DUPLICATE);
@@ -434,7 +444,7 @@ class SystemOidcProviderServiceTest {
         when(cryptoPort.encrypt(any())).thenReturn("encrypted");
 
         service.registerWithValidation("test", "Test", "https://example.com",
-                "client", "secret", "user");
+                "client", "secret", null, "user");
 
         verify(providerRepository, times(1)).save(any());
         verify(statusRepository, times(1)).save(any());
@@ -448,7 +458,7 @@ class SystemOidcProviderServiceTest {
         when(cryptoPort.encrypt(any())).thenReturn("encrypted");
 
         service.registerWithValidation("test", "Test", "https://example.com",
-                "client", "secret", "user");
+                "client", "secret", null, "user");
 
         ArgumentCaptor<SystemOidcProvider> pCap =
                 ArgumentCaptor.forClass(SystemOidcProvider.class);
@@ -472,7 +482,7 @@ class SystemOidcProviderServiceTest {
         when(cryptoPort.encrypt("new-plain-secret")).thenReturn("new-encrypted");
 
         service.updateMutableFields("master", "New Display",
-                "new-client-id", "new-plain-secret", "user:admin");
+                "new-client-id", "new-plain-secret", null, "user:admin");
 
         ArgumentCaptor<SystemOidcProvider> captor =
                 ArgumentCaptor.forClass(SystemOidcProvider.class);
@@ -492,13 +502,14 @@ class SystemOidcProviderServiceTest {
         String originalUri = "https://auth.example/realms/master";
         SystemOidcProvider current = new SystemOidcProvider(
                 "master", BASE_TIME, "Old", originalUri,
-                "old-client", "old-encrypted", BASE_TIME, "user:old");
+                "old-client", "old-encrypted",
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "user:old");
         when(providerRepository.findLatestByProviderId("master"))
                 .thenReturn(Optional.of(current));
         when(cryptoPort.encrypt("new-secret")).thenReturn("new-encrypted");
 
         service.updateMutableFields("master", "New", "new-client",
-                "new-secret", "user:admin");
+                "new-secret", null, "user:admin");
 
         ArgumentCaptor<SystemOidcProvider> captor =
                 ArgumentCaptor.forClass(SystemOidcProvider.class);
@@ -513,7 +524,7 @@ class SystemOidcProviderServiceTest {
         when(providerRepository.findLatestByProviderId("master"))
                 .thenReturn(Optional.of(current));
 
-        service.updateMutableFields("master", "New", "new-client", null, "user:admin");
+        service.updateMutableFields("master", "New", "new-client", null, null, "user:admin");
 
         ArgumentCaptor<SystemOidcProvider> captor =
                 ArgumentCaptor.forClass(SystemOidcProvider.class);
@@ -529,7 +540,7 @@ class SystemOidcProviderServiceTest {
         when(providerRepository.findLatestByProviderId("master"))
                 .thenReturn(Optional.of(current));
 
-        service.updateMutableFields("master", "New", "new-client", "", "user:admin");
+        service.updateMutableFields("master", "New", "new-client", "", null, "user:admin");
 
         ArgumentCaptor<SystemOidcProvider> captor =
                 ArgumentCaptor.forClass(SystemOidcProvider.class);
@@ -545,7 +556,7 @@ class SystemOidcProviderServiceTest {
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() ->
-                service.updateMutableFields("not-exist", "X", "x", "x", "u"))
+                service.updateMutableFields("not-exist", "X", "x", "x", null, "u"))
                 .isInstanceOf(OidcProviderException.class)
                 .extracting("error")
                 .isEqualTo(OidcProviderError.PROVIDER_NOT_FOUND);
@@ -580,13 +591,13 @@ class SystemOidcProviderServiceTest {
     void listAll_sortedByEnabledFirstThenName() {
         SystemOidcProvider g = new SystemOidcProvider(
                 "google", BASE_TIME, "Google", "u-g", "c-g", "s-g",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
         SystemOidcProvider m = new SystemOidcProvider(
                 "master", BASE_TIME, "Master", "u-m", "c-m", "s-m",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
         SystemOidcProvider a = new SystemOidcProvider(
                 "azure", BASE_TIME, "Azure AD", "u-a", "c-a", "s-a",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
 
         when(providerRepository.findAllLatest()).thenReturn(List.of(g, m, a));
         when(statusRepository.findLatestByProviderId("google"))
@@ -852,13 +863,13 @@ class SystemOidcProviderServiceTest {
 
         SystemOidcProvider zoom = new SystemOidcProvider(
                 "zoom", BASE_TIME, "Zoom OIDC", "u-z", "c-z", "s-z",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
         SystemOidcProvider google = new SystemOidcProvider(
                 "google", BASE_TIME, "google workspace", "u-g", "c-g", "s-g",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
         SystemOidcProvider azure = new SystemOidcProvider(
                 "azure", BASE_TIME, "Azure AD", "u-a", "c-a", "s-a",
-                BASE_TIME, "u");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "u");
 
         when(providerRepository.findLatestByProviderId("zoom")).thenReturn(Optional.of(zoom));
         when(providerRepository.findLatestByProviderId("google")).thenReturn(Optional.of(google));

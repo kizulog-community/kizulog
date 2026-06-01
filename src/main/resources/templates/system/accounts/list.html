@@ -45,10 +45,10 @@
             <!-- テーブル -->
             <div class="card">
                 <div class="card-body p-0">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light">
                         <tr>
-                            <th th:text="#{system.accounts.list.column.accountId}">アカウントID</th>
+                            <th th:text="#{system.accounts.list.column.account}">アカウント</th>
                             <th th:text="#{system.accounts.list.column.status}">ステータス</th>
                             <th th:text="#{system.accounts.list.column.role}">ロール</th>
                             <th th:text="#{system.accounts.list.column.identities}">identity数</th>
@@ -58,10 +58,60 @@
                         </thead>
                         <tbody>
                         <tr th:each="item : ${items}">
+                            <!-- ============================================================ -->
+                            <!-- T.0: 名前を主表示、UUIDを小さくグレー                          -->
+                            <!-- claimsPerAccount から familyName/givenName/organization/email  -->
+                            <!-- を取得して表示                                                  -->
+                            <!-- ============================================================ -->
                             <td>
-                                <span class="font-monospace small" th:text="${item.accountId}">acc-uuid</span>
-                                <span th:if="${item.self}" class="badge text-bg-info ms-2 small"
-                                      th:text="#{system.accounts.list.selfBadge}">自分</span>
+                                <th:block th:with="
+                                    claims=${claimsPerAccount.get(item.accountId)},
+                                    familyName=${claims != null ? claims.get('familyName') : null},
+                                    givenName=${claims != null ? claims.get('givenName') : null},
+                                    middleName=${claims != null ? claims.get('middleName') : null},
+                                    organization=${claims != null ? claims.get('organization') : null},
+                                    email=${claims != null ? claims.get('email') : null},
+                                    hasName=${familyName != null or givenName != null or middleName != null}">
+
+                                    <!-- 名前部分（姓 名 ミドルネーム） -->
+                                    <div class="fw-semibold">
+                                        <th:block th:if="${hasName}">
+                                            <span th:if="${familyName != null}" th:text="${familyName}">山田</span>
+                                            <th:block th:if="${familyName != null and givenName != null}"> </th:block>
+                                            <span th:if="${givenName != null}" th:text="${givenName}">太郎</span>
+                                            <span th:if="${middleName != null}" class="ms-1" th:text="${middleName}">M.</span>
+                                        </th:block>
+                                        <!-- 名前なし→emailにフォールバック -->
+                                        <span th:if="${!hasName and email != null}" th:text="${email}">user@example.com</span>
+                                        <!-- emailもなし -->
+                                        <span th:if="${!hasName and email == null}"
+                                              class="text-muted fst-italic"
+                                              th:text="#{system.accounts.list.namelessFallback}">
+                                            （名前情報なし）
+                                        </span>
+
+                                        <!-- 自分バッジ -->
+                                        <span th:if="${item.self}" class="badge text-bg-info ms-2 small"
+                                              th:text="#{system.accounts.list.selfBadge}">自分</span>
+                                    </div>
+
+                                    <!-- 所属 -->
+                                    <div th:if="${organization != null}" class="text-muted small">
+                                        <i class="bi bi-building me-1"></i>
+                                        <span th:text="${organization}">開発部</span>
+                                    </div>
+
+                                    <!-- メール（名前部分でfallbackとして使っていない場合のみ） -->
+                                    <div th:if="${hasName and email != null}" class="text-muted small">
+                                        <i class="bi bi-envelope me-1"></i>
+                                        <span th:text="${email}">user@example.com</span>
+                                    </div>
+
+                                    <!-- UUID -->
+                                    <div class="text-muted small font-monospace"
+                                         style="font-size: 0.75rem;"
+                                         th:text="${item.accountId}">acc-uuid</div>
+                                </th:block>
                             </td>
                             <td>
                                 <span th:if="${item.currentStatus.name() == 'ACTIVE'}"
@@ -86,7 +136,8 @@
                                 <span th:text="${item.activeIdentityCount}">1</span>
                             </td>
                             <td>
-                                <span th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.createdAt)}">
+                                <span class="small"
+                                      th:text="${@dateTimeFormatHelper.formatDateTimeShort(item.createdAt)}">
                                     2026-05-14 18:00
                                 </span>
                             </td>
@@ -111,6 +162,9 @@
         </main>
     </div>
 </div>
+
+<!-- 共通フッタ -->
+<footer th:replace="~{system/fragments/layout :: footer}"></footer>
 
 <script th:replace="~{system/fragments/layout :: scripts}"></script>
 </body>

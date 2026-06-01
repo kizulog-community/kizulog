@@ -1,7 +1,10 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.system.accounts;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -21,7 +24,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import io.github.kizulog_community.kizulog.domain.systemaccount.exception.AccountStatusChangeException;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountDetailView;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountListItemView;
+import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountManagementService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
+import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.IdentityClaimsViewService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.accounts.dto.AccountStatusChangeForm;
 import jakarta.validation.Valid;
@@ -29,13 +37,6 @@ import lombok.RequiredArgsConstructor;
 
 /**
  * システム管理アカウント管理画面のコントローラー
- *
- * <p>提供画面:
- * <ul>
- * <li>GET  /system/accounts/list                       - 一覧</li>
- * <li>GET  /system/accounts/{accountId}                - 詳細</li>
- * <li>POST /system/accounts/{accountId}/status         - ステータス変更</li>
- * </ul>
  *
  * @author Jun Kobayashi
  */
@@ -54,40 +55,57 @@ public class SystemAccountManagementController {
     /** メッセージソース */
     private final MessageSource messageSource;
 
+    /** Identityリポジトリ（T.0シリーズで追加） */
+    private final SystemAccountIdentityRepository identityRepository;
+
+    /** OIDCプロバイダーリポジトリ（T.0シリーズで追加） */
+    private final SystemOidcProviderRepository providerRepository;
+
+    /** Identityクレームビューサービス（T.0シリーズで追加） */
+    private final IdentityClaimsViewService identityClaimsViewService;
+
     /**
      * アカウント一覧画面を表示する。
-     *
-     * @param principal 認証済みプリンシパル
-     * @param model モデル
-     * @return 一覧テンプレート
      */
     @GetMapping("/list")
     public String list(
             @AuthenticationPrincipal SystemUserPrincipal principal,
+            Locale locale,
             Model model) {
 
         String operatorId = (principal != null) ? principal.getAccountId() : null;
         List<AccountListItemView> items =
                 accountManagementService.listAllAccounts(operatorId);
 
+        Map<String, List<Map<String, String>>> claimsDisplayPerAccount = new LinkedHashMap<>();
+        Map<String, Map<String, String>> claimsPerAccount = new LinkedHashMap<>();
+
+        for (AccountListItemView item : items) {
+            List<Map<String, String>> display =
+                    identityClaimsViewService.resolveClaimsDisplayForAccount(
+                            item.getAccountId(), locale);
+            claimsDisplayPerAccount.put(item.getAccountId(), display);
+
+            Map<String, String> claims =
+                    identityClaimsViewService.resolveClaimsViewForAccount(item.getAccountId());
+            claimsPerAccount.put(item.getAccountId(), claims);
+        }
+
         model.addAttribute("activeMenu", "accounts");
         model.addAttribute("items", items);
+        model.addAttribute("claimsDisplayPerAccount", claimsDisplayPerAccount);
+        model.addAttribute("claimsPerAccount", claimsPerAccount);
         return "system/accounts/list";
     }
 
     /**
      * アカウント詳細画面を表示する。
-     *
-     * @param accountId アカウントID
-     * @param principal 認証済みプリンシパル
-     * @param model モデル
-     * @param redirectAttrs リダイレクト属性（見つからない場合のリダイレクト用）
-     * @return 詳細テンプレート、または一覧へのリダイレクト
      */
     @GetMapping("/{accountId}")
     public String detail(
             @PathVariable("accountId") String id,
             @AuthenticationPrincipal SystemUserPrincipal principal,
+            Locale locale,
             Model model,
             RedirectAttributes redirectAttrs) {
 
@@ -103,6 +121,32 @@ public class SystemAccountManagementController {
         model.addAttribute("activeMenu", "accounts");
         model.addAttribute("account", opt.get());
 
+        List<SystemAccountIdentity> identities = identityRepository.findLatestByAccountId(id);
+        List<Map<String, Object>> identitiesView = new ArrayList<>();
+        List<SystemOidcProvider> allProviders = providerRepository.findAllLatest();
+
+        for (SystemAccountIdentity identity : identities) {
+            Map<String, Object> view = new LinkedHashMap<>();
+            view.put("identityId", identity.getIdentityId());
+            view.put("iss", identity.getIss());
+            view.put("aud", identity.getAud());
+            view.put("sub", identity.getSub());
+            view.put("createdAt", identity.getCreatedAt());
+
+            String providerDisplayName = resolveProviderDisplayName(
+                    identity.getIss(), allProviders);
+            view.put("providerDisplayName", providerDisplayName);
+
+            List<Map<String, String>> claimsDisplay =
+                    identityClaimsViewService.resolveClaimsDisplay(
+                            identity.getIdentityId(), locale);
+            view.put("claimsDisplay", claimsDisplay);
+
+            identitiesView.add(view);
+        }
+
+        model.addAttribute("identitiesView", identitiesView);
+
         if (!model.containsAttribute("statusChangeForm")) {
             model.addAttribute("statusChangeForm", new AccountStatusChangeForm());
         }
@@ -110,15 +154,28 @@ public class SystemAccountManagementController {
     }
 
     /**
+     * iss URI から OIDC プロバイダの表示名を解決する。末尾スラッシュ揺れを吸収。
+     */
+    private String resolveProviderDisplayName(
+            String iss, List<SystemOidcProvider> allProviders) {
+        if (iss == null) {
+            return null;
+        }
+        String normalizedIss = iss.replaceAll("/+$", "");
+        for (SystemOidcProvider p : allProviders) {
+            if (p.getUri() == null) {
+                continue;
+            }
+            String normalizedUri = p.getUri().replaceAll("/+$", "");
+            if (normalizedUri.equals(normalizedIss)) {
+                return p.getDisplayName();
+            }
+        }
+        return null;
+    }
+
+    /**
      * アカウントのステータスを変更する。
-     *
-     * @param accountId アカウントID
-     * @param form フォーム
-     * @param bindingResult 検証結果
-     * @param principal 認証済みプリンシパル
-     * @param locale ロケール
-     * @param redirectAttrs リダイレクト属性
-     * @return 詳細画面へリダイレクト
      */
     @PostMapping("/{accountId}/status")
     public String changeStatus(

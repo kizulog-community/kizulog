@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<!--
+    ============================================================
+    KizuLog アプリケーション共通フッタフラグメント
+    （S.0シリーズで新設）
+
+    呼び出し方:
+        <footer th:replace="~{common/fragments/footer :: footer}"></footer>
+
+    表示内容:
+        - コミュニティ名: "KizuLog Community"
+        - バージョン: ApplicationFooterAdvice経由のBuildProperties由来
+        - ライセンス名: "Apache License 2.0" (Apache公式へ外部リンク)
+
+    Modelへの依存:
+        applicationFooter属性が必須。ApplicationFooterAdviceが全Controllerに
+        自動投入するため、各Controllerでの個別設定は不要。
+
+    スタイル:
+        Bootstrap 5.3.3標準のtext-muted・border-top・smallクラスを使用。
+        各画面のレイアウトに馴染むよう、独立スタイルは最小限。
+    ============================================================
+-->
+<body>
+
+<footer th:fragment="footer" class="app-footer mt-4 py-3 border-top">
+    <div class="container text-center text-muted small">
+
+        <!-- 横並び（PCタブレット）／縦並び（モバイル） -->
+        <div class="d-flex flex-column flex-md-row justify-content-center align-items-center gap-2">
+
+            <!-- コミュニティ名（固有名詞のためi18n対象外） -->
+            <span class="app-footer-community">
+                <i class="bi bi-people-fill me-1"></i>
+                <span th:text="${applicationFooter != null ? applicationFooter.communityName : 'KizuLog Community'}">
+                    KizuLog Community
+                </span>
+            </span>
+
+            <!-- 区切り（PCのみ表示） -->
+            <span class="d-none d-md-inline app-footer-separator">|</span>
+
+            <!-- バージョン情報 -->
+            <span class="app-footer-version"
+                  th:if="${applicationFooter != null and not #strings.isEmpty(applicationFooter.version)}">
+                <span th:text="#{app.footer.version.label}">Version</span>
+                <code th:text="${applicationFooter.version}">1.000001.1-SNAPSHOT</code>
+            </span>
+
+            <!-- 区切り（バージョン表示時かつPCのみ） -->
+            <span class="d-none d-md-inline app-footer-separator"
+                  th:if="${applicationFooter != null and not #strings.isEmpty(applicationFooter.version)}">|</span>
+
+            <!-- ライセンス情報（Apache公式ページへ外部リンク） -->
+            <span class="app-footer-license">
+                <a th:href="#{app.footer.license.url}"
+                   target="_blank"
+                   rel="noopener noreferrer"
+                   class="text-muted text-decoration-none">
+                    <i class="bi bi-file-earmark-text me-1"></i>
+                    <span th:text="${applicationFooter != null ? applicationFooter.licenseName : 'Apache License 2.0'}">
+                        Apache License 2.0
+                    </span>
+                    <i class="bi bi-box-arrow-up-right ms-1 small"></i>
+                </a>
+            </span>
+
+        </div>
+
+    </div>
+</footer>
+
+</body>
+</html>

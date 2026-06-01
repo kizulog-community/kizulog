@@ -26,6 +26,7 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAcco
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentityStatus;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityStatusRepository;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.DecryptedOidcProvider;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
@@ -310,7 +311,7 @@ class SystemAccountIdentityLinkServiceTest {
         List<LinkedIdentityView> result = sut.listLinkedIdentities(accountId, "id-a");
 
         assertThat(result).hasSize(2);
-        // ACTIVE優先で並ぶ
+
         assertThat(result.get(0).getIdentityId()).isEqualTo("id-a");
         assertThat(result.get(0).isActive()).isTrue();
         assertThat(result.get(0).isCurrentSession()).isTrue();
@@ -416,7 +417,8 @@ class SystemAccountIdentityLinkServiceTest {
             String providerId, String displayName, String uri, OidcProviderStatusValue status) {
         OffsetDateTime version = OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
         SystemOidcProvider provider = new SystemOidcProvider(
-                providerId, version, displayName, uri, "client", "enc-secret", version, "test");
+                providerId, version, displayName, uri, "client", "enc-secret",
+                ClaimsMappingTarget.defaultMapping(), version, "test");
         SystemOidcProviderStatus statusObj = new SystemOidcProviderStatus(
                 providerId, version, status, null, version, "test");
         return new ProviderWithStatus(provider, statusObj);

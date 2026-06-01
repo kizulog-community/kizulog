@@ -167,6 +167,40 @@
                     </div>
                 </div>
 
+
+                <!-- T.0: クレームマッピング設定 -->
+                <div class="card mb-3">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">
+                            <i class="bi bi-diagram-2 me-2"></i>
+                            <span th:text="#{system.oidcProviders.claimsMapping.title}">クレームマッピング設定</span>
+                        </h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3"
+                           th:text="#{system.oidcProviders.claimsMapping.description}">
+                            OIDC プロバイダから取得するユーザ属性のクレームキー設定です。
+                        </p>
+                        <dl class="row mb-0">
+                            <th:block th:each="target : ${claimsMappingTargets}">
+                                <dt class="col-sm-3"
+                                    th:text="#{|system.oidcProviders.claimsMapping.target.${target.key}|}">姓</dt>
+                                <dd class="col-sm-9">
+                                    <th:block th:with="claimKey=${provider.getClaimMapping(target.key)}">
+                                        <code th:if="${claimKey != null and !#strings.isEmpty(claimKey)}"
+                                              th:text="${claimKey}">family_name</code>
+                                        <span th:unless="${claimKey != null and !#strings.isEmpty(claimKey)}"
+                                              class="text-muted small"
+                                              th:text="#{system.oidcProviders.claimsMapping.unmapped}">
+                                            （マッピングなし）
+                                        </span>
+                                    </th:block>
+                                </dd>
+                            </th:block>
+                        </dl>
+                    </div>
+                </div>
+
                 <!-- 利用状況 -->
                 <div class="card mb-3">
                     <div class="card-header">
@@ -343,6 +377,9 @@
             </form>
         </div>
     </div>
+
+    <!-- 共通フッタ（S.0シリーズで追加） -->
+    <footer th:replace="~{system/fragments/layout :: footer}"></footer>
 
     <th:block th:replace="~{system/fragments/layout :: scripts}"></th:block>
 

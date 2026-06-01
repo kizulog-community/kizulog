@@ -34,6 +34,7 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.exception.OidcCon
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
@@ -61,6 +62,7 @@ class OidcProvidersControllerTest {
     private OidcProviderService oidcProviderService;
     private SystemAccountIdentityRepository identityRepository;
     private MessageSource messageSource;
+    private CurrentSessionClaimsResolver currentSessionClaimsResolver;
     private OidcProvidersController controller;
 
     private Model model;
@@ -73,11 +75,15 @@ class OidcProvidersControllerTest {
         oidcProviderService = mock(OidcProviderService.class);
         identityRepository = mock(SystemAccountIdentityRepository.class);
         messageSource = mock(MessageSource.class);
+        currentSessionClaimsResolver = mock(CurrentSessionClaimsResolver.class);
+        when(currentSessionClaimsResolver.resolveClaims(any()))
+                .thenReturn(java.util.Collections.emptyMap());
         controller = new OidcProvidersController(
                 systemOidcProviderService,
                 oidcProviderService,
                 identityRepository,
-                messageSource);
+                messageSource,
+                currentSessionClaimsResolver);
 
         model = new ConcurrentModel();
         redirectAttrs = new RedirectAttributesModelMap();
@@ -92,7 +98,7 @@ class OidcProvidersControllerTest {
                 id, BASE_TIME, "Display " + id,
                 "https://auth.example/realms/" + id,
                 "client-" + id, "encrypted-secret",
-                BASE_TIME, "user");
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "user");
     }
 
     private SystemOidcProviderStatus statusOf(
@@ -193,7 +199,7 @@ class OidcProvidersControllerTest {
     @Test
     @DisplayName("newForm: 空のフォームをmodelに設定し、newビューを返す")
     void newForm_setsEmptyFormAndReturnsNewView() {
-        String view = controller.newForm(model);
+        String view = controller.newForm(principal, model);
 
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/new");
         assertThat(model.getAttribute("oidcProviderForm"))
@@ -207,7 +213,7 @@ class OidcProvidersControllerTest {
         preExisting.setProviderId("preset");
         model.addAttribute("oidcProviderForm", preExisting);
 
-        controller.newForm(model);
+        controller.newForm(principal, model);
 
         OidcProviderForm result =
                 (OidcProviderForm) model.getAttribute("oidcProviderForm");
@@ -234,7 +240,7 @@ class OidcProvidersControllerTest {
                 .containsKey("flashSuccessParam");
         verify(systemOidcProviderService).registerWithValidation(
                 eq("test"), eq("Test"), eq("https://example.com"),
-                eq("c"), eq("s"), eq("admin-account-id"));
+                eq("c"), eq("s"), any(), eq("admin-account-id"));
     }
 
     @Test
@@ -249,7 +255,7 @@ class OidcProvidersControllerTest {
 
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/new");
         verify(systemOidcProviderService, never()).registerWithValidation(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -269,7 +275,7 @@ class OidcProvidersControllerTest {
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/new");
         assertThat(br.getGlobalErrors()).isNotEmpty();
         verify(systemOidcProviderService, never()).registerWithValidation(
-                any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -282,7 +288,7 @@ class OidcProvidersControllerTest {
 
         doThrow(new OidcProviderException(OidcProviderError.PROVIDER_ID_DUPLICATE))
                 .when(systemOidcProviderService).registerWithValidation(
-                        any(), any(), any(), any(), any(), any());
+                        any(), any(), any(), any(), any(), any(), any());
 
         String view = controller.create(form, br, principal,
                 Locale.JAPAN, redirectAttrs, model);
@@ -301,7 +307,7 @@ class OidcProvidersControllerTest {
 
         doThrow(new OidcProviderException(OidcProviderError.PROVIDER_ID_INVALID_FORMAT))
                 .when(systemOidcProviderService).registerWithValidation(
-                        any(), any(), any(), any(), any(), any());
+                        any(), any(), any(), any(), any(), any(), any());
 
         String view = controller.create(form, br, principal,
                 Locale.JAPAN, redirectAttrs, model);
@@ -316,7 +322,7 @@ class OidcProvidersControllerTest {
         when(systemOidcProviderService.findDetailByProviderId("master"))
                 .thenReturn(Optional.of(pwsOf("master", OidcProviderStatusValue.ENABLED)));
 
-        String view = controller.editForm("master", model, redirectAttrs);
+        String view = controller.editForm("master", principal, model, redirectAttrs);
 
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/edit");
         OidcProviderEditForm form =
@@ -331,7 +337,7 @@ class OidcProvidersControllerTest {
         when(systemOidcProviderService.findDetailByProviderId("not-exist"))
                 .thenReturn(Optional.empty());
 
-        String view = controller.editForm("not-exist", model, redirectAttrs);
+        String view = controller.editForm("not-exist", principal, model, redirectAttrs);
 
         assertThat(view).isEqualTo("redirect:/system/system-settings/oidc-providers");
         assertThat(redirectAttrs.getFlashAttributes())
@@ -358,7 +364,7 @@ class OidcProvidersControllerTest {
         assertThat(view).isEqualTo("redirect:/system/system-settings/oidc-providers/master");
         verify(systemOidcProviderService).updateMutableFields(
                 eq("master"), eq("New Master"), eq("new-client"),
-                eq("new-secret"), eq("admin-account-id"));
+                eq("new-secret"), any(), eq("admin-account-id"));
     }
 
     @Test
@@ -373,7 +379,7 @@ class OidcProvidersControllerTest {
 
         assertThat(view).isEqualTo("redirect:/system/system-settings/oidc-providers");
         verify(systemOidcProviderService, never()).updateMutableFields(
-                any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -389,7 +395,7 @@ class OidcProvidersControllerTest {
 
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/edit");
         verify(systemOidcProviderService, never()).updateMutableFields(
-                any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -407,7 +413,7 @@ class OidcProvidersControllerTest {
 
         assertThat(view).isEqualTo("redirect:/system/system-settings/oidc-providers");
         verify(systemOidcProviderService, never()).updateMutableFields(
-                any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -428,7 +434,7 @@ class OidcProvidersControllerTest {
         assertThat(view).isEqualTo("system/system-settings/oidc-providers/edit");
         assertThat(br.getGlobalErrors()).isNotEmpty();
         verify(systemOidcProviderService, never()).updateMutableFields(
-                any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -444,7 +450,7 @@ class OidcProvidersControllerTest {
                 .thenReturn(Optional.of(pwsOf("master", OidcProviderStatusValue.ENABLED)));
         doThrow(new OidcProviderException(OidcProviderError.PROVIDER_NOT_FOUND))
                 .when(systemOidcProviderService).updateMutableFields(
-                        any(), any(), any(), any(), any());
+                        any(), any(), any(), any(), any(), any());
 
         String view = controller.update("master", form, br, principal,
                 Locale.JAPAN, redirectAttrs, model);

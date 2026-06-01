@@ -2,6 +2,7 @@ package io.github.kizulog_community.kizulog.domain.setup;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.Map;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -24,6 +25,7 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.LanguageSetting;
 import io.github.kizulog_community.kizulog.domain.systemconfig.model.TimezoneSetting;
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.LocalizationSettingService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
 import io.github.kizulog_community.kizulog.domain.systemoidc.service.SystemOidcProviderService;
 import io.github.kizulog_community.kizulog.infrastructure.web.setup.OidcSetting;
@@ -73,7 +75,7 @@ public class SetupService {
      *
      * <p>同一トランザクション・同一バージョンで以下を保存する。</p>
      * <ol>
-     * <li>system_oidc_providers + system_oidc_provider_status（OIDC接続情報）</li>
+     * <li>system_oidc_providers + system_oidc_provider_status（OIDC接続情報、claimsMapping は OidcSetting から取得）</li>
      * <li>system_config（言語・タイムゾーン）</li>
      * <li>system_accounts（初期管理者本体）</li>
      * <li>system_account_status（ACTIVE）</li>
@@ -91,12 +93,19 @@ public class SetupService {
 
         // 1. OIDCプロバイダー保存（一覧分すべて）
         for (OidcSetting oidc : sessionData.getOidcSettings()) {
+            Map<String, String> claimsMapping = oidc.getClaimsMapping();
+            // null/空の場合はデフォルトマッピングを採用（防御的）
+            if (claimsMapping == null || claimsMapping.isEmpty()) {
+                claimsMapping = ClaimsMappingTarget.defaultMapping();
+            }
+
             systemOidcProviderService.register(
                     oidc.getId(),
-                    oidc.getId(),                  // displayName: セットアップ時はidをそのまま流用
+                    oidc.getId(),
                     oidc.getUri(),
                     oidc.getClientId(),
-                    oidc.getClientSecret(),         // 平文（Service内で暗号化）
+                    oidc.getClientSecret(),
+                    claimsMapping,
                     OidcProviderStatusValue.ENABLED,
                     version,
                     CREATED_BY);

@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -16,6 +18,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 import org.springframework.context.annotation.Import;
 
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.AbstractRepositoryIT;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.systemoidc.entity.SystemOidcProviderEntity;
@@ -23,9 +26,6 @@ import io.github.kizulog_community.kizulog.infrastructure.persistence.systemoidc
 
 /**
  * SystemOidcProviderRepositoryImpl の統合テスト
- *
- * <p>Output Port（SystemOidcProviderRepository）のメソッドについて、
- * 正常系・境界値・異常系を検証する。</p>
  *
  * @author Jun Kobayashi
  */
@@ -222,7 +222,8 @@ class SystemOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
         SystemOidcProvider provider = new SystemOidcProvider(
                 "master", BASE_TIME, "Master Display",
                 "https://auth.example/realms/master",
-                "client-1", "secret-1", BASE_TIME, "user:setup");
+                "client-1", "secret-1",
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "user:setup");
 
         sut.save(provider);
 
@@ -247,11 +248,13 @@ class SystemOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
         SystemOidcProvider providerV1 = new SystemOidcProvider(
                 "master", v1, "Master V1",
                 "https://auth.example/realms/master",
-                "client-1", "secret-1", v1, "user:1");
+                "client-1", "secret-1",
+                ClaimsMappingTarget.defaultMapping(), v1, "user:1");
         SystemOidcProvider providerV2 = new SystemOidcProvider(
                 "master", v2, "Master V2",
                 "https://auth.example/realms/master",
-                "client-2", "secret-2", v2, "user:2");
+                "client-2", "secret-2",
+                ClaimsMappingTarget.defaultMapping(), v2, "user:2");
 
         sut.save(providerV1);
         sut.save(providerV2);
@@ -270,7 +273,7 @@ class SystemOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
                 "google", BASE_TIME, "Google Workspace",
                 "https://accounts.google.com",
                 "kizulog-google-client", "encrypted-secret-value",
-                createdAt, "system:setup-wizard");
+                ClaimsMappingTarget.defaultMapping(), createdAt, "system:setup-wizard");
 
         sut.save(provider);
 
@@ -286,12 +289,63 @@ class SystemOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
         assertThat(reloaded.get().getCreatedBy()).isEqualTo("system:setup-wizard");
     }
 
+
+    @Test
+    @DisplayName("save: T.0シリーズ - claimsMappingがJSONB列に往復で保存・取得できる")
+    void save_claimsMappingPersistedAsJsonb() {
+        Map<String, String> mapping = new LinkedHashMap<>();
+        mapping.put("familyName", "family_name");
+        mapping.put("givenName", "given_name");
+        mapping.put("organization", "dept");
+        mapping.put("email", "mail");
+
+        SystemOidcProvider provider = new SystemOidcProvider(
+                "keycloak", BASE_TIME, "Keycloak", "https://auth.example/realms/master",
+                "client-1", "secret-1",
+                mapping, BASE_TIME, "user:test");
+
+        sut.save(provider);
+
+        Optional<SystemOidcProvider> reloaded = sut.findLatestByProviderId("keycloak");
+        assertThat(reloaded).isPresent();
+        Map<String, String> reloadedMapping = reloaded.get().getClaimsMappingView();
+        assertThat(reloadedMapping)
+                .containsEntry("familyName", "family_name")
+                .containsEntry("givenName", "given_name")
+                .containsEntry("organization", "dept")
+                .containsEntry("email", "mail");
+    }
+
+    @Test
+    @DisplayName("save: T.0シリーズ - claimsMappingがデフォルトマッピングで永続化される")
+    void save_claimsMappingWithDefaultMapping() {
+        SystemOidcProvider provider = new SystemOidcProvider(
+                "master", BASE_TIME, "Master", "https://auth.example/realms/master",
+                "client-1", "secret-1",
+                ClaimsMappingTarget.defaultMapping(), BASE_TIME, "user:test");
+
+        sut.save(provider);
+
+        Optional<SystemOidcProvider> reloaded = sut.findLatestByProviderId("master");
+        assertThat(reloaded).isPresent();
+        Map<String, String> reloadedMapping = reloaded.get().getClaimsMappingView();
+        // ClaimsMappingTarget の全5値が含まれることを確認
+        assertThat(reloadedMapping)
+                .containsEntry("familyName", "family_name")
+                .containsEntry("givenName", "given_name")
+                .containsEntry("middleName", "middle_name")
+                .containsEntry("organization", "organization")
+                .containsEntry("email", "email");
+    }
+
     private void saveEntity(
+
             String providerId, OffsetDateTime version, String displayName,
             String uri, String clientId, String clientSecret, String createdBy) {
         SystemOidcProviderEntity entity = new SystemOidcProviderEntity(
                 new SystemOidcProviderId(providerId, version),
                 displayName, uri, clientId, clientSecret,
+                ClaimsMappingTarget.defaultMapping(),
                 OffsetDateTime.now(ZoneOffset.UTC), createdBy);
         jpaRepository.save(entity);
     }

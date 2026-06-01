@@ -13,6 +13,7 @@ import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +33,10 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.exception.Accoun
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountDetailView;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountListItemView;
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.AccountStatus;
+import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountManagementService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
+import io.github.kizulog_community.kizulog.domain.systemoidc.service.IdentityClaimsViewService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import io.github.kizulog_community.kizulog.infrastructure.web.system.accounts.dto.AccountStatusChangeForm;
 
@@ -52,13 +56,29 @@ class SystemAccountManagementControllerTest {
 
     private SystemAccountManagementService service;
     private MessageSource messageSource;
+    private SystemAccountIdentityRepository identityRepository;
+    private SystemOidcProviderRepository providerRepository;
+    private IdentityClaimsViewService identityClaimsViewService;
     private SystemAccountManagementController sut;
 
     @BeforeEach
     void setUp() {
         service = mock(SystemAccountManagementService.class);
         messageSource = mock(MessageSource.class);
-        sut = new SystemAccountManagementController(service, messageSource);
+        identityRepository = mock(SystemAccountIdentityRepository.class);
+        providerRepository = mock(SystemOidcProviderRepository.class);
+        identityClaimsViewService = mock(IdentityClaimsViewService.class);
+
+        when(identityRepository.findLatestByAccountId(any())).thenReturn(List.of());
+        when(providerRepository.findAllLatest()).thenReturn(List.of());
+        when(identityClaimsViewService.resolveClaimsView(any())).thenReturn(Map.of());
+        when(identityClaimsViewService.resolveClaimsViewForAccount(any())).thenReturn(Map.of());
+        when(identityClaimsViewService.resolveClaimsDisplay(any(), any())).thenReturn(List.of());
+        when(identityClaimsViewService.resolveClaimsDisplayForAccount(any(), any())).thenReturn(List.of());
+
+        sut = new SystemAccountManagementController(
+                service, messageSource,
+                identityRepository, providerRepository, identityClaimsViewService);
     }
 
     private SystemUserPrincipal operator() {
@@ -89,11 +109,13 @@ class SystemAccountManagementControllerTest {
         when(service.listAllAccounts(OPERATOR_ID)).thenReturn(List.of(a, b));
 
         Model model = new ConcurrentModel();
-        String view = sut.list(operator(), model);
+        String view = sut.list(operator(), Locale.JAPANESE, model);
 
         assertThat(view).isEqualTo("system/accounts/list");
         assertThat(model.getAttribute("activeMenu")).isEqualTo("accounts");
         assertThat(model.getAttribute("items")).isEqualTo(List.of(a, b));
+        assertThat(model.getAttribute("claimsDisplayPerAccount")).isNotNull();
+        assertThat(model.getAttribute("claimsPerAccount")).isNotNull();
     }
 
     @Test
@@ -102,7 +124,7 @@ class SystemAccountManagementControllerTest {
         when(service.listAllAccounts(null)).thenReturn(List.of());
 
         Model model = new ConcurrentModel();
-        sut.list(null, model);
+        sut.list(null, Locale.JAPANESE, model);
 
         verify(service).listAllAccounts(null);
     }
@@ -115,12 +137,13 @@ class SystemAccountManagementControllerTest {
 
         Model model = new ConcurrentModel();
         RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
-        String view = sut.detail("acc-1", operator(), model, redirectAttrs);
+        String view = sut.detail("acc-1", operator(), Locale.JAPANESE, model, redirectAttrs);
 
         assertThat(view).isEqualTo("system/accounts/detail");
         assertThat(model.getAttribute("account")).isEqualTo(v);
         assertThat(model.getAttribute("statusChangeForm"))
                 .isInstanceOf(AccountStatusChangeForm.class);
+        assertThat(model.getAttribute("identitiesView")).isNotNull();
     }
 
     @Test
@@ -130,7 +153,7 @@ class SystemAccountManagementControllerTest {
 
         Model model = new ConcurrentModel();
         RedirectAttributes redirectAttrs = new RedirectAttributesModelMap();
-        String view = sut.detail("missing", operator(), model, redirectAttrs);
+        String view = sut.detail("missing", operator(), Locale.JAPANESE, model, redirectAttrs);
 
         assertThat(view).isEqualTo("redirect:/system/accounts/list");
         assertThat(redirectAttrs.getFlashAttributes().get("flashErrorKey"))

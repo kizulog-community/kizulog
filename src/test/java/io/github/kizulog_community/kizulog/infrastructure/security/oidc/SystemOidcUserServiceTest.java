@@ -32,6 +32,7 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.exception.Identi
 import io.github.kizulog_community.kizulog.domain.systemaccount.model.SystemAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccountIdentityRepository;
 import io.github.kizulog_community.kizulog.domain.systemaccount.service.SystemAccountIdentityLinkService;
+import io.github.kizulog_community.kizulog.domain.systemaccountprofile.service.SystemAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationError;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.exception.InvitationException;
 import io.github.kizulog_community.kizulog.domain.systemadmininvitation.service.InvitationAcceptanceService;
@@ -67,6 +68,8 @@ class SystemOidcUserServiceTest {
     private SystemAccountIdentityLinkService identityLinkService;
     private InvitationAcceptanceSession invitationSession;
     private IdentityLinkSession identityLinkSession;
+    private OidcClaimsFilter claimsFilter;
+    private SystemAccountProfileService profileService;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private SystemOidcUserService sut;
 
@@ -79,14 +82,16 @@ class SystemOidcUserServiceTest {
         identityLinkService = mock(SystemAccountIdentityLinkService.class);
         invitationSession = mock(InvitationAcceptanceSession.class);
         identityLinkSession = mock(IdentityLinkSession.class);
+        claimsFilter = mock(OidcClaimsFilter.class);
+        profileService = mock(SystemAccountProfileService.class);
         @SuppressWarnings("unchecked")
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
                 mock(OAuth2UserService.class);
         delegate = mockDelegate;
 
-        // 既定: pending無し（通常ログインフロー）
         when(invitationSession.isPending()).thenReturn(false);
         when(identityLinkSession.isPending()).thenReturn(false);
+        when(claimsFilter.filter(any())).thenReturn(java.util.Collections.emptyMap());
 
         sut = new SystemOidcUserService(
                 authService,
@@ -96,6 +101,8 @@ class SystemOidcUserServiceTest {
                 identityLinkService,
                 invitationSession,
                 identityLinkSession,
+                claimsFilter,
+                profileService,
                 delegate);
     }
 

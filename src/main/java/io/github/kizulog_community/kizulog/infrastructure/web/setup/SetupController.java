@@ -2,6 +2,7 @@ package io.github.kizulog_community.kizulog.infrastructure.web.setup;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -30,6 +31,7 @@ import io.github.kizulog_community.kizulog.domain.shared.SupportedLanguage;
 import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
 import io.github.kizulog_community.kizulog.domain.systemconfig.exception.OidcConnectionException;
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -66,9 +68,6 @@ public class SetupController {
 
     /**
      * Step0：言語選択画面を表示
-     *
-     * @param model モデル
-     * @return Step0テンプレート
      */
     @GetMapping("/step0")
     public String step0(Model model) {
@@ -245,11 +244,20 @@ public class SetupController {
 
         setupSessionData.setHost(formData.getHost());
 
-        OidcSetting oidcSetting = formData.getOidcSetting();
-        oidcSetting.setId("master");
+        // T.0: 既存のclaimsMappingを保持しつつ、その他フィールドを上書き
+        OidcSetting newOidc = formData.getOidcSetting();
+        newOidc.setId("master");
+
+        OidcSetting existing = setupSessionData.getOidcSettings().isEmpty()
+                ? null : setupSessionData.getOidcSettings().get(0);
+        if (existing != null
+                && existing.getClaimsMapping() != null
+                && !existing.getClaimsMapping().isEmpty()) {
+            newOidc.setClaimsMapping(new LinkedHashMap<>(existing.getClaimsMapping()));
+        }
 
         setupSessionData.getOidcSettings().clear();
-        setupSessionData.getOidcSettings().add(oidcSetting);
+        setupSessionData.getOidcSettings().add(newOidc);
         return "redirect:/setup/step3";
     }
 
@@ -263,11 +271,78 @@ public class SetupController {
     }
 
     /**
+     * Step3.5：クレームマッピング設定画面を表示
+     */
+    @GetMapping("/step3-5")
+    public String step3_5(Model model) {
+        if (setupSessionData.getAdminSub() == null) {
+            // OIDCログイン未完了 → step3 へ戻す
+            return "redirect:/setup/step3";
+        }
+
+        model.addAttribute("sessionData", setupSessionData);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+        model.addAttribute("currentClaims", setupSessionData.getAdminClaims());
+
+        if (!model.containsAttribute("step3_5FormData")) {
+            Step3_5FormData formData = new Step3_5FormData();
+            // セッションのOIDC設定からclaimsMappingを復元
+            OidcSetting oidcSetting = setupSessionData.getOidcSettings().isEmpty()
+                    ? null : setupSessionData.getOidcSettings().get(0);
+            if (oidcSetting != null && oidcSetting.getClaimsMapping() != null
+                    && !oidcSetting.getClaimsMapping().isEmpty()) {
+                formData.setClaimsMapping(new LinkedHashMap<>(oidcSetting.getClaimsMapping()));
+            }
+            model.addAttribute("step3_5FormData", formData);
+        }
+
+        return "setup/step3_5";
+    }
+
+    /**
+     * Step3.5：クレームマッピング設定を受け取りStep4へ遷移（T.0シリーズで追加）
+     */
+    @PostMapping("/step3-5")
+    public String step3_5Submit(
+            @ModelAttribute("step3_5FormData") Step3_5FormData formData,
+            BindingResult bindingResult,
+            Model model) {
+
+        if (bindingResult.hasErrors()) {
+            model.addAttribute("sessionData", setupSessionData);
+            model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+            model.addAttribute("currentClaims", setupSessionData.getAdminClaims());
+            return "setup/step3_5";
+        }
+
+        // 既存のOIDC設定にclaimsMappingを反映
+        if (!setupSessionData.getOidcSettings().isEmpty()) {
+            OidcSetting oidcSetting = setupSessionData.getOidcSettings().get(0);
+            Map<String, String> mapping = formData.getClaimsMapping();
+            if (mapping == null) {
+                mapping = new LinkedHashMap<>();
+            }
+            // 空文字をフィルタ（マッピングしない扱い）
+            Map<String, String> normalized = new LinkedHashMap<>();
+            for (ClaimsMappingTarget target : ClaimsMappingTarget.values()) {
+                String value = mapping.get(target.getKey());
+                if (value != null && !value.isBlank()) {
+                    normalized.put(target.getKey(), value.strip());
+                }
+            }
+            oidcSetting.setClaimsMapping(normalized);
+        }
+
+        return "redirect:/setup/step4";
+    }
+
+    /**
      * Step4：確認画面を表示
      */
     @GetMapping("/step4")
     public String step4(Model model) {
         model.addAttribute("sessionData", setupSessionData);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
         return "setup/step4";
     }
 
@@ -371,10 +446,46 @@ public class SetupController {
         setupSessionData.setAdminAud(oidcSetting.getClientId());
         setupSessionData.setAdminSub(claims.getSubject());
 
+        Map<String, Object> rawClaims = claims.getClaims();
+        Map<String, Object> filteredClaims = new LinkedHashMap<>();
+        if (rawClaims != null) {
+            for (Map.Entry<String, Object> e : rawClaims.entrySet()) {
+                String key = e.getKey();
+                // OIDC認証メタ情報は除外（表示候補に値しないため）
+                if (isAuthenticationMetaClaim(key)) {
+                    continue;
+                }
+                filteredClaims.put(key, e.getValue());
+            }
+        }
+        setupSessionData.setAdminClaims(filteredClaims);
+
         session.removeAttribute("oidc_state");
         session.removeAttribute("oidc_redirect_uri");
 
         return "redirect:/setup/step3";
+    }
+
+    /**
+     * OIDC認証メタ情報のクレームキーか判定する（Step3.5表示用フィルタ）。
+     *
+     * <p>iat/exp等の時刻系、nonce/jti/at_hash等の認証強度系は
+     * 表示・マッピング候補としては不要なため除外する。</p>
+     *
+     * @param key クレームキー
+     * @return メタ情報の場合true
+     */
+    private static boolean isAuthenticationMetaClaim(String key) {
+        if (key == null) {
+            return false;
+        }
+        return switch (key) {
+            case "iss", "aud", "sub", "iat", "exp", "nbf", "auth_time",
+                 "jti", "nonce", "at_hash", "c_hash", "azp", "acr", "amr",
+                 "sid", "typ", "session_state", "scope", "allowed-origins"
+                    -> true;
+            default -> false;
+        };
     }
 
 }

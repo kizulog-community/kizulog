@@ -2,6 +2,7 @@ package io.github.kizulog_community.kizulog.infrastructure.web.system.systemsett
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 import org.slf4j.Logger;
@@ -27,6 +28,7 @@ import io.github.kizulog_community.kizulog.domain.systemconfig.exception.OidcCon
 import io.github.kizulog_community.kizulog.domain.systemconfig.service.OidcProviderService;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderError;
 import io.github.kizulog_community.kizulog.domain.systemoidc.exception.OidcProviderException;
+import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.OidcProviderStatusValue;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ProviderWithStatus;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
@@ -72,6 +74,9 @@ public class OidcProvidersController {
     /** メッセージソース */
     private final MessageSource messageSource;
 
+    /** 現在のセッションのクレーム取得Resolver（マッピング候補表示用） */
+    private final CurrentSessionClaimsResolver currentSessionClaimsResolver;
+
     @GetMapping
     public String list(
             @RequestParam(defaultValue = "all") String filter,
@@ -105,9 +110,8 @@ public class OidcProvidersController {
         OidcProviderDetailView view = toDetailView(opt.get());
         model.addAttribute("activeMenu", "system-settings");
         model.addAttribute("provider", view);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
 
-        // G.6: 「最低1つENABLED」UI事前ガード用フラグ
-        // 現状ENABLEDで、他にENABLEDなプロバイダーが存在しない場合は無効化不可
         int otherEnabledCount = systemOidcProviderService.countOtherEnabled(providerId);
         model.addAttribute("canDisable", otherEnabledCount > 0);
 
@@ -118,11 +122,18 @@ public class OidcProvidersController {
     }
 
     @GetMapping("/new")
-    public String newForm(Model model) {
+    public String newForm(
+            @AuthenticationPrincipal SystemUserPrincipal principal,
+            Model model) {
         if (!model.containsAttribute("oidcProviderForm")) {
-            model.addAttribute("oidcProviderForm", new OidcProviderForm());
+            OidcProviderForm form = new OidcProviderForm();
+            form.ensureDefaults();
+            model.addAttribute("oidcProviderForm", form);
         }
         model.addAttribute("activeMenu", "system-settings");
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+        model.addAttribute("currentSessionClaims",
+                currentSessionClaimsResolver.resolveClaims(principal));
         return "system/system-settings/oidc-providers/new";
     }
 
@@ -136,7 +147,7 @@ public class OidcProvidersController {
             Model model) {
 
         if (bindingResult.hasErrors()) {
-            model.addAttribute("activeMenu", "system-settings");
+            populateFormViewModel(model, principal);
             return "system/system-settings/oidc-providers/new";
         }
 
@@ -149,7 +160,7 @@ public class OidcProvidersController {
                     "Connection failed",
                     locale);
             bindingResult.reject("oidcConnectionError", errorMessage);
-            model.addAttribute("activeMenu", "system-settings");
+            populateFormViewModel(model, principal);
             return "system/system-settings/oidc-providers/new";
         }
 
@@ -161,6 +172,7 @@ public class OidcProvidersController {
                     form.getUri(),
                     form.getClientId(),
                     form.getClientSecret(),
+                    form.getClaimsMapping(),
                     createdBy);
         } catch (OidcProviderException e) {
             String errorMessage = messageSource.getMessage(
@@ -176,7 +188,7 @@ public class OidcProvidersController {
             } else {
                 bindingResult.reject("providerError", errorMessage);
             }
-            model.addAttribute("activeMenu", "system-settings");
+            populateFormViewModel(model, principal);
             return "system/system-settings/oidc-providers/new";
         }
 
@@ -190,6 +202,7 @@ public class OidcProvidersController {
     @GetMapping("/{providerId}/edit")
     public String editForm(
             @PathVariable String providerId,
+            @AuthenticationPrincipal SystemUserPrincipal principal,
             Model model,
             RedirectAttributes redirectAttrs) {
         Optional<ProviderWithStatus> opt =
@@ -207,10 +220,14 @@ public class OidcProvidersController {
             form.setUri(p.getUri());
             form.setDisplayName(p.getDisplayName());
             form.setClientId(p.getClientId());
+            form.populateFromExisting(p.getClaimsMappingView());
             model.addAttribute("oidcProviderEditForm", form);
         }
         model.addAttribute("activeMenu", "system-settings");
         model.addAttribute("clientSecretMasked", SECRET_MASK);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+        model.addAttribute("currentSessionClaims",
+                currentSessionClaimsResolver.resolveClaims(principal));
         return "system/system-settings/oidc-providers/edit";
     }
 
@@ -231,8 +248,7 @@ public class OidcProvidersController {
         }
 
         if (bindingResult.hasErrors()) {
-            model.addAttribute("activeMenu", "system-settings");
-            model.addAttribute("clientSecretMasked", SECRET_MASK);
+            populateEditViewModel(model, principal);
             return "system/system-settings/oidc-providers/edit";
         }
 
@@ -254,8 +270,7 @@ public class OidcProvidersController {
                     "Connection failed",
                     locale);
             bindingResult.reject("oidcConnectionError", errorMessage);
-            model.addAttribute("activeMenu", "system-settings");
-            model.addAttribute("clientSecretMasked", SECRET_MASK);
+            populateEditViewModel(model, principal);
             return "system/system-settings/oidc-providers/edit";
         }
 
@@ -270,6 +285,7 @@ public class OidcProvidersController {
                     form.getDisplayName(),
                     form.getClientId(),
                     secretToPass,
+                    form.getClaimsMapping(),
                     updatedBy);
         } catch (OidcProviderException e) {
             String errorMessage = messageSource.getMessage(
@@ -278,8 +294,7 @@ public class OidcProvidersController {
                     "Update failed",
                     locale);
             bindingResult.reject("providerError", errorMessage);
-            model.addAttribute("activeMenu", "system-settings");
-            model.addAttribute("clientSecretMasked", SECRET_MASK);
+            populateEditViewModel(model, principal);
             return "system/system-settings/oidc-providers/edit";
         }
 
@@ -423,6 +438,23 @@ public class OidcProvidersController {
         }
     }
 
+    /** new画面再描画用モデル投入ヘルパー */
+    private void populateFormViewModel(Model model, SystemUserPrincipal principal) {
+        model.addAttribute("activeMenu", "system-settings");
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+        model.addAttribute("currentSessionClaims",
+                currentSessionClaimsResolver.resolveClaims(principal));
+    }
+
+    /** edit画面再描画用モデル投入ヘルパー */
+    private void populateEditViewModel(Model model, SystemUserPrincipal principal) {
+        model.addAttribute("activeMenu", "system-settings");
+        model.addAttribute("clientSecretMasked", SECRET_MASK);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
+        model.addAttribute("currentSessionClaims",
+                currentSessionClaimsResolver.resolveClaims(principal));
+    }
+
     private boolean matchesFilter(ProviderWithStatus pws, String filter) {
         if ("all".equalsIgnoreCase(filter)) {
             return true;
@@ -459,6 +491,7 @@ public class OidcProvidersController {
                 (s != null) ? s.getStatus() : OidcProviderStatusValue.DISABLED;
         String reason = (s != null) ? s.getReason() : null;
         int count = systemAccountIdentityRepository.countActiveByIss(p.getUri());
+        Map<String, String> claimsMapping = p.getClaimsMappingView();
         return new OidcProviderDetailView(
                 p.getProviderId(),
                 p.getDisplayName(),
@@ -468,6 +501,7 @@ public class OidcProvidersController {
                 statusValue,
                 reason,
                 count,
+                claimsMapping,
                 p.getCreatedAt(),
                 p.getCreatedBy());
     }
