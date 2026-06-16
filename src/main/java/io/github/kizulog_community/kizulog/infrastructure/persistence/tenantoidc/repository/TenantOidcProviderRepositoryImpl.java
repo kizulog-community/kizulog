@@ -65,6 +65,7 @@ public class TenantOidcProviderRepositoryImpl
                 entity.getAud(),
                 entity.getClientId(),
                 entity.getClientSecret(),
+                entity.getClaimsMapping(),
                 entity.getCreatedAt(),
                 entity.getCreatedBy());
     }
@@ -80,6 +81,7 @@ public class TenantOidcProviderRepositoryImpl
                 domain.getAud(),
                 domain.getClientId(),
                 domain.getClientSecret(),
+                domain.getClaimsMapping(),
                 domain.getCreatedAt(),
                 domain.getCreatedBy());
     }

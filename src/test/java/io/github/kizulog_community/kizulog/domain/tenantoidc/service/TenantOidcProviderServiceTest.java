@@ -29,6 +29,7 @@ import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOid
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderStatusChangeException;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateError;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateException;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.DecryptedTenantOidcProvider;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.EnabledTenantOidcProviderView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
@@ -92,6 +93,7 @@ class TenantOidcProviderServiceTest {
                 "https://auth.example/realms/" + providerId,
                 "aud-" + providerId,
                 "client-" + providerId, encryptedSecret,
+                ClaimsMappingTarget.defaultMapping(),
                 version, "user:" + providerId);
     }
 
@@ -110,10 +112,12 @@ class TenantOidcProviderServiceTest {
         TenantOidcProvider provider1 = new TenantOidcProvider(
                 TENANT_ID, "zebra", BASE_TIME, "Display zebra",
                 "https://auth.example/zebra", "aud-zebra", "client", "secret",
+                ClaimsMappingTarget.defaultMapping(),
                 BASE_TIME, "creator");
         TenantOidcProvider provider2 = new TenantOidcProvider(
                 TENANT_ID, "apple", BASE_TIME, "Display apple",
                 "https://auth.example/apple", "aud-apple", "client", "secret",
+                ClaimsMappingTarget.defaultMapping(),
                 BASE_TIME, "creator");
         when(providerRepository.findAllLatestByTenantId(TENANT_ID))
                 .thenReturn(List.of(provider1, provider2));
@@ -634,6 +638,7 @@ class TenantOidcProviderServiceTest {
         TenantOidcProvider existing = new TenantOidcProvider(
                 TENANT_ID, "existing", BASE_TIME, "Existing",
                 "https://iss", "aud", "client", "secret",
+                ClaimsMappingTarget.defaultMapping(),
                 BASE_TIME, "creator");
         when(providerRepository.findAllLatestByIssAndAud("https://iss", "aud"))
                 .thenReturn(List.of(existing));
@@ -656,6 +661,7 @@ class TenantOidcProviderServiceTest {
         TenantOidcProvider otherTenantProvider = new TenantOidcProvider(
                 OTHER_TENANT_ID, "google", BASE_TIME, "Other Tenant Google",
                 "https://iss", "aud", "client", "secret",
+                ClaimsMappingTarget.defaultMapping(),
                 BASE_TIME, "creator");
         when(providerRepository.findAllLatestByIssAndAud("https://iss", "aud"))
                 .thenReturn(List.of(otherTenantProvider));

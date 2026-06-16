@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" th:lang="${#locale.language}">
+<head th:replace="~{tenant/fragments/layout :: head(title=#{tenant.my-profile.title})}">
+    <!-- layout.html の ::head で置き換えられる -->
+</head>
+<body>
+
+<nav th:replace="~{tenant/fragments/layout :: header}"></nav>
+
+<div class="container py-4" style="max-width: 900px;">
+
+    <!-- ページタイトル -->
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="h3 mb-0">
+            <i class="bi bi-person-gear me-2"></i>
+            <span th:text="#{tenant.my-profile.title}">プロフィール設定</span>
+        </h1>
+    </div>
+
+    <p class="text-muted mb-4" th:text="#{tenant.my-profile.description}">
+        あなた自身のアカウント情報を確認します。
+    </p>
+
+    <!-- ============================================================ -->
+    <!-- あなたの情報セクション                                        -->
+    <!-- ============================================================ -->
+    <div class="card mb-4">
+        <div class="card-header bg-light">
+            <i class="bi bi-person-circle me-1"></i>
+            <span th:text="#{tenant.my-profile.section.myInfo}">あなたの情報</span>
+        </div>
+        <div class="card-body">
+            <div class="row g-3">
+
+                <!-- 左カラム: プロフィール（氏名・所属・email） -->
+                <div class="col-md-6">
+                    <h6 class="text-muted small fw-semibold mb-2">
+                        <i class="bi bi-person-vcard me-1"></i>
+                        <span th:text="#{tenant.my-profile.section.myInfo.profile}">プロフィール</span>
+                    </h6>
+
+                    <!-- プロフィール情報が空の場合 -->
+                    <p th:if="${userDisplay == null
+                                or (userDisplay.nameEmpty
+                                    and userDisplay.organization == null
+                                    and userDisplay.email == null)}"
+                       class="text-muted small mb-0">
+                        <i class="bi bi-dash-circle me-1"></i>
+                        <span th:text="#{tenant.my-profile.section.myInfo.empty}">
+                            取得できたプロフィール情報はありません
+                        </span>
+                    </p>
+
+                    <!-- プロフィール情報がある場合 -->
+                    <dl th:if="${userDisplay != null
+                                 and not (userDisplay.nameEmpty
+                                          and userDisplay.organization == null
+                                          and userDisplay.email == null)}"
+                        class="row mb-0 small">
+                        <th:block th:if="${userDisplay.familyName != null}">
+                            <dt class="col-sm-4 text-muted"
+                                th:text="#{tenant.my-profile.section.myInfo.familyName}">姓</dt>
+                            <dd class="col-sm-8 mb-2" th:text="${userDisplay.familyName}">山田</dd>
+                        </th:block>
+                        <th:block th:if="${userDisplay.givenName != null}">
+                            <dt class="col-sm-4 text-muted"
+                                th:text="#{tenant.my-profile.section.myInfo.givenName}">名</dt>
+                            <dd class="col-sm-8 mb-2" th:text="${userDisplay.givenName}">太郎</dd>
+                        </th:block>
+                        <th:block th:if="${userDisplay.middleName != null}">
+                            <dt class="col-sm-4 text-muted"
+                                th:text="#{tenant.my-profile.section.myInfo.middleName}">ミドルネーム</dt>
+                            <dd class="col-sm-8 mb-2" th:text="${userDisplay.middleName}">M.</dd>
+                        </th:block>
+                        <th:block th:if="${userDisplay.organization != null}">
+                            <dt class="col-sm-4 text-muted"
+                                th:text="#{tenant.my-profile.section.myInfo.organization}">所属</dt>
+                            <dd class="col-sm-8 mb-2" th:text="${userDisplay.organization}">開発部</dd>
+                        </th:block>
+                        <th:block th:if="${userDisplay.email != null}">
+                            <dt class="col-sm-4 text-muted"
+                                th:text="#{tenant.my-profile.section.myInfo.email}">メールアドレス</dt>
+                            <dd class="col-sm-8 mb-0" th:text="${userDisplay.email}">taro@example.com</dd>
+                        </th:block>
+                    </dl>
+                </div>
+
+                <!-- 右カラム: ログイン中Identity 接続情報 -->
+                <div class="col-md-6">
+                    <h6 class="text-muted small fw-semibold mb-2">
+                        <i class="bi bi-key me-1"></i>
+                        <span th:text="#{tenant.my-profile.section.myInfo.connection}">ログイン中Identity</span>
+                    </h6>
+                    <dl class="row mb-0 small">
+                        <dt class="col-sm-4 text-muted"
+                            th:text="#{tenant.my-profile.section.myInfo.iss}">Issuer</dt>
+                        <dd class="col-sm-8 mb-2">
+                            <code class="text-break"
+                                  th:text="${principal != null ? principal.iss : '-'}">https://auth/realm</code>
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted"
+                            th:text="#{tenant.my-profile.section.myInfo.aud}">Audience</dt>
+                        <dd class="col-sm-8 mb-2">
+                            <code th:text="${principal != null ? principal.aud : '-'}">client-id</code>
+                        </dd>
+
+                        <dt class="col-sm-4 text-muted"
+                            th:text="#{tenant.my-profile.section.myInfo.sub}">Subject</dt>
+                        <dd class="col-sm-8 mb-0">
+                            <code class="text-break"
+                                  th:text="${principal != null ? principal.sub : '-'}">user-uuid</code>
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <a th:href="@{/dashboard}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left me-1"></i>
+        <span th:text="#{tenant.my-profile.backToDashboard}">ダッシュボードへ戻る</span>
+    </a>
+</div>
+
+<footer th:replace="~{tenant/fragments/layout :: footer}"></footer>
+<th:block th:replace="~{tenant/fragments/layout :: scripts}"></th:block>
+</body>
+</html>

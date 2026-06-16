@@ -16,6 +16,7 @@ import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabas
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase.Replace;
 import org.springframework.context.annotation.Import;
 
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.AbstractRepositoryIT;
 import io.github.kizulog_community.kizulog.infrastructure.persistence.tenantoidc.entity.TenantOidcProviderEntity;
@@ -61,6 +62,7 @@ class TenantOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
         TenantOidcProviderEntity entity = new TenantOidcProviderEntity(
                 new TenantOidcProviderId(tenantId, providerId, version),
                 displayName, iss, aud, clientId, clientSecret,
+                ClaimsMappingTarget.defaultMapping(),
                 version, createdBy);
         jpaRepository.save(entity);
     }
@@ -264,6 +266,7 @@ class TenantOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
                 TENANT_A, "new-provider", BASE_TIME,
                 "New Display", "https://new.iss", "new-aud",
                 "new-cid", "new-encrypted-sec",
+                ClaimsMappingTarget.defaultMapping(),
                 BASE_TIME, "creator");
 
         sut.save(provider);
@@ -282,10 +285,10 @@ class TenantOidcProviderRepositoryImplIT extends AbstractRepositoryIT {
         OffsetDateTime v2 = BASE_TIME.plusHours(1);
         sut.save(new TenantOidcProvider(
                 TENANT_A, "google", v1, "Google v1", "https://iss", "aud",
-                "cid-1", "sec-1", v1, "creator-1"));
+                "cid-1", "sec-1", ClaimsMappingTarget.defaultMapping(), v1, "creator-1"));
         sut.save(new TenantOidcProvider(
                 TENANT_A, "google", v2, "Google v2", "https://iss", "aud",
-                "cid-2", "sec-2", v2, "creator-2"));
+                "cid-2", "sec-2", ClaimsMappingTarget.defaultMapping(), v2, "creator-2"));
 
         // 両 version が存在
         assertThat(jpaRepository.findAll()).hasSize(2);

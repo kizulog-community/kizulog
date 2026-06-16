@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.model.TenantAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.model.TenantRole;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.port.TenantAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.tenantaccountprofile.service.TenantAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.exception.TenantInvitationError;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.service.TenantAdminAcceptanceService;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.service.TenantAdminInvitationService;
@@ -79,6 +80,12 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
     /** 招待受諾セッション（sessionスコープProxy Bean） */
     private final TenantInvitationAcceptanceSession invitationSession;
 
+    /** OIDCクレームフィルタ（ホワイトリスト） */
+    private final OidcClaimsFilter claimsFilter;
+
+    /** プロファイルキャッシュService */
+    private final TenantAccountProfileService profileService;
+
     /** Spring標準のOidcUserService（デリゲート） */
     private final OAuth2UserService<OidcUserRequest, OidcUser> delegate;
 
@@ -90,6 +97,8 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
      * @param tenantAdminAcceptanceService 招待受諾オーケストレーションサービス
      * @param invitationService 招待管理サービス
      * @param invitationSession 招待受諾セッション
+     * @param claimsFilter OIDCクレームフィルタ（ホワイトリスト）
+     * @param profileService プロファイルキャッシュService
      */
     @Autowired
     public TenantOidcUserService(
@@ -97,13 +106,17 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
             TenantAccountIdentityRepository tenantAccountIdentityRepository,
             TenantAdminAcceptanceService tenantAdminAcceptanceService,
             TenantAdminInvitationService invitationService,
-            TenantInvitationAcceptanceSession invitationSession) {
+            TenantInvitationAcceptanceSession invitationSession,
+            OidcClaimsFilter claimsFilter,
+            TenantAccountProfileService profileService) {
         this(
                 tenantAuthenticationService,
                 tenantAccountIdentityRepository,
                 tenantAdminAcceptanceService,
                 invitationService,
                 invitationSession,
+                claimsFilter,
+                profileService,
                 new OidcUserService());
     }
 
@@ -115,6 +128,8 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
      * @param tenantAdminAcceptanceService 招待受諾オーケストレーションサービス
      * @param invitationService 招待管理サービス
      * @param invitationSession 招待受諾セッション
+     * @param claimsFilter OIDCクレームフィルタ（ホワイトリスト）
+     * @param profileService プロファイルキャッシュService
      * @param delegate Spring標準OidcUserService
      */
     TenantOidcUserService(
@@ -123,12 +138,16 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
             TenantAdminAcceptanceService tenantAdminAcceptanceService,
             TenantAdminInvitationService invitationService,
             TenantInvitationAcceptanceSession invitationSession,
+            OidcClaimsFilter claimsFilter,
+            TenantAccountProfileService profileService,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.tenantAuthenticationService = tenantAuthenticationService;
         this.tenantAccountIdentityRepository = tenantAccountIdentityRepository;
         this.tenantAdminAcceptanceService = tenantAdminAcceptanceService;
         this.invitationService = invitationService;
         this.invitationSession = invitationSession;
+        this.claimsFilter = claimsFilter;
+        this.profileService = profileService;
         this.delegate = delegate;
     }
 
@@ -176,7 +195,10 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
             activeRoles = result.getActiveRoles();
         }
 
-        // 5) TenantUserPrincipalを生成してSpring Securityに返却
+        // 5) U.0: プロファイル更新（fail-open）
+        updateProfileCache(identity, oidcUser, sub);
+
+        // 6) TenantUserPrincipalを生成してSpring Securityに返却
         return TenantUserPrincipal.ofTenantUser(
                 tenantId,
                 identity.getAccountId(),
@@ -186,6 +208,30 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
                 sub,
                 oidcUser.getIdToken(),
                 activeRoles);
+    }
+
+    /**
+     * プロファイルキャッシュを更新する（fail-open）。
+     *
+     * <p>ホワイトリストフィルタ後のクレームを tenant_account_profiles に
+     * 差分があった場合のみ新バージョンとして保存する。
+     * キャッシュ更新の失敗はログのみで握りつぶし、認証自体は継続させる。</p>
+     *
+     * @param identity 認証成功したidentity
+     * @param oidcUser OIDCユーザ情報
+     * @param sub createdBy として記録する値
+     */
+    private void updateProfileCache(
+            TenantAccountIdentity identity, OidcUser oidcUser, String sub) {
+        try {
+            var filtered = claimsFilter.filter(oidcUser.getClaims());
+            if (!filtered.isEmpty()) {
+                profileService.upsertIfChanged(identity.getIdentityId(), filtered, sub);
+            }
+        } catch (RuntimeException e) {
+            log.warn("Failed to update tenant profile cache: identityId={}, error={}",
+                    identity.getIdentityId(), e.getMessage());
+        }
     }
 
     /**

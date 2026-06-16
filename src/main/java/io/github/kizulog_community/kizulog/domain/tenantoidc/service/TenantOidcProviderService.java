@@ -20,6 +20,7 @@ import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOid
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderStatusChangeException;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateError;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateException;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.DecryptedTenantOidcProvider;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.EnabledTenantOidcProviderView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
@@ -316,9 +317,12 @@ public class TenantOidcProviderService {
         String encryptedSecret = cryptoPort.encrypt(plainClientSecret);
 
         // プロバイダー本体保存
+        // claims_mapping は登録時点ではデフォルトマッピング（DBデフォルトと一致）。
+        // 個別マッピングの編集UIは Phase 6 で追加し、本メソッドを引数化する。
         TenantOidcProvider provider = new TenantOidcProvider(
                 tenantId, providerId, now,
                 displayName, iss, aud, clientId, encryptedSecret,
+                ClaimsMappingTarget.defaultMapping(),
                 now, "system:tenant-oidc-register:" + operatorId);
         providerRepository.save(provider);
 
@@ -375,20 +379,19 @@ public class TenantOidcProviderService {
         validateReason(reason,
                 TenantOidcProviderUpdateError.REASON_INVALID);
 
-        // client_secret: 空なら現在値維持、入力ありなら暗号化
         String encryptedSecret;
         if (plainClientSecret == null || plainClientSecret.isEmpty()) {
-            encryptedSecret = current.getClientSecret(); // 暗号化済み値をそのまま継承
+            encryptedSecret = current.getClientSecret();
         } else {
             encryptedSecret = cryptoPort.encrypt(plainClientSecret);
         }
 
-        // 新version保存（iss/aud は不変）
         OffsetDateTime now = OffsetDateTime.now(ZoneOffset.UTC);
         TenantOidcProvider updated = new TenantOidcProvider(
                 tenantId, providerId, now,
                 displayName, current.getIss(), current.getAud(),
                 clientId, encryptedSecret,
+                current.getClaimsMappingCopy(),
                 now, "system:tenant-oidc-update:" + operatorId);
         providerRepository.save(updated);
     }

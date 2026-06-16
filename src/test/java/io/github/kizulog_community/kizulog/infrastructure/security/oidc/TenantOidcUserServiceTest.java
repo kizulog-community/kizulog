@@ -29,6 +29,7 @@ import org.springframework.security.oauth2.core.oidc.user.OidcUser;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.model.TenantAccountIdentity;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.model.TenantRole;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.port.TenantAccountIdentityRepository;
+import io.github.kizulog_community.kizulog.domain.tenantaccountprofile.service.TenantAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.exception.TenantInvitationError;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.exception.TenantInvitationException;
 import io.github.kizulog_community.kizulog.domain.tenantadmininvitation.service.TenantAdminAcceptanceService;
@@ -66,6 +67,8 @@ class TenantOidcUserServiceTest {
     private TenantAdminInvitationService invitationService;
     private TenantInvitationAcceptanceSession invitationSession;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
+    private OidcClaimsFilter claimsFilter;
+    private TenantAccountProfileService profileService;
     private TenantOidcUserService sut;
 
     @BeforeEach
@@ -80,12 +83,18 @@ class TenantOidcUserServiceTest {
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
                 mock(OAuth2UserService.class);
         delegate = mockDelegate;
+        claimsFilter = mock(OidcClaimsFilter.class);
+        profileService = mock(TenantAccountProfileService.class);
+        // 既定ではフィルタ結果を空にし、プロファイル保存は呼ばれないようにする
+        when(claimsFilter.filter(any())).thenReturn(java.util.Collections.emptyMap());
         sut = new TenantOidcUserService(
                 authService,
                 identityRepository,
                 acceptanceService,
                 invitationService,
                 invitationSession,
+                claimsFilter,
+                profileService,
                 delegate);
     }
 
