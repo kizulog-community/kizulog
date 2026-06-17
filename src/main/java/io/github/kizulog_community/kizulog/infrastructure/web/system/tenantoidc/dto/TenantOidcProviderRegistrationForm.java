@@ -1,5 +1,9 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.system.tenantoidc.dto;
 
+import java.util.LinkedHashMap;
+import java.util.Map;
+
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -19,23 +23,19 @@ public class TenantOidcProviderRegistrationForm {
 
     /** プロバイダー識別子（[a-z0-9-]+ 1-32文字、不変） */
     @NotBlank(message = "{system.tenants.oidc.form.error.providerId.required}")
-    @Size(min = 1, max = 32,
-            message = "{system.tenants.oidc.form.error.providerId.size}")
-    @Pattern(regexp = "^[a-z0-9-]+$",
-            message = "{system.tenants.oidc.form.error.providerId.pattern}")
+    @Size(min = 1, max = 32, message = "{system.tenants.oidc.form.error.providerId.size}")
+    @Pattern(regexp = "^[a-z0-9-]+$", message = "{system.tenants.oidc.form.error.providerId.pattern}")
     private String providerId;
 
     /** 表示名（編集可） */
     @NotBlank(message = "{system.tenants.oidc.form.error.displayName.required}")
-    @Size(max = 100,
-            message = "{system.tenants.oidc.form.error.displayName.tooLong}")
+    @Size(max = 100, message = "{system.tenants.oidc.form.error.displayName.tooLong}")
     private String displayName;
 
     /** OIDC Issuer URI */
     @NotBlank(message = "{system.tenants.oidc.form.error.iss.required}")
     @Size(max = 500, message = "{system.tenants.oidc.form.error.iss.tooLong}")
-    @Pattern(regexp = "^https?://.+$",
-            message = "{system.tenants.oidc.form.error.iss.pattern}")
+    @Pattern(regexp = "^https?://.+$", message = "{system.tenants.oidc.form.error.iss.pattern}")
     private String iss;
 
     /** Audience */
@@ -45,8 +45,7 @@ public class TenantOidcProviderRegistrationForm {
 
     /** クライアントID（編集可） */
     @NotBlank(message = "{system.tenants.oidc.form.error.clientId.required}")
-    @Size(max = 255,
-            message = "{system.tenants.oidc.form.error.clientId.tooLong}")
+    @Size(max = 255, message = "{system.tenants.oidc.form.error.clientId.tooLong}")
     private String clientId;
 
     /** クライアントシークレット（編集可、平文入力） */
@@ -55,8 +54,20 @@ public class TenantOidcProviderRegistrationForm {
 
     /** 登録理由 */
     @NotBlank(message = "{system.tenants.oidc.form.error.reason.required}")
-    @Size(max = 1000,
-            message = "{system.tenants.oidc.form.error.reason.tooLong}")
+    @Size(max = 1000, message = "{system.tenants.oidc.form.error.reason.tooLong}")
     private String reason;
+
+    /** クレームマッピング設定（key=ClaimsMappingTarget#getKey, value=クレームキー） */
+    private Map<String, String> claimsMapping = new LinkedHashMap<>();
+
+    /**
+     * デフォルトマッピングで初期化する（新規画面表示時等で使用）。
+     */
+    public void ensureDefaults() {
+        Map<String, String> defaults = ClaimsMappingTarget.defaultMapping();
+        for (Map.Entry<String, String> e : defaults.entrySet()) {
+            claimsMapping.putIfAbsent(e.getKey(), e.getValue());
+        }
+    }
 
 }

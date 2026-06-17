@@ -13,7 +13,7 @@ import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcPro
  *
  * @author Jun Kobayashi
  */
-@Service
+@Service("tenantClaimsMappingResolver")
 public class ClaimsMappingResolver {
 
     /**

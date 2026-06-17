@@ -208,6 +208,54 @@
                         </div>
                     </div>
 
+                    <!-- クレームマッピング設定 -->
+                    <div class="card mb-3">
+                        <div class="card-header">
+                            <h6 class="mb-0">
+                                <i class="bi bi-diagram-3 me-1"></i>
+                                <span th:text="#{system.oidcProviders.claimsMapping.title}">クレームマッピング設定</span>
+                            </h6>
+                        </div>
+                        <div class="card-body">
+                            <p class="text-muted small mb-3"
+                               th:text="#{system.oidcProviders.claimsMapping.description}">
+                                OIDC プロバイダから取得するユーザ属性のクレームキー設定です。
+                            </p>
+
+                            <!-- マッピング設定（input + datalist） -->
+                            <div class="mb-3" th:each="target : ${claimsMappingTargets}">
+                                <label class="form-label fw-semibold"
+                                       th:for="${'claimsMapping_' + target.key}">
+                                    <span th:text="#{|system.oidcProviders.claimsMapping.target.${target.key}|}">姓</span>
+                                    <span class="text-muted small fw-normal"
+                                          th:text="|(${target.key})|">(familyName)</span>
+                                </label>
+                                <input type="text"
+                                       th:id="${'claimsMapping_' + target.key}"
+                                       th:field="*{claimsMapping[__${target.key}__]}"
+                                       class="form-control"
+                                       th:list="${'claimsMapping_list_' + target.key}"
+                                       th:placeholder="${target.defaultClaimName}"
+                                       autocomplete="off"
+                                       maxlength="100" />
+                                <datalist th:id="${'claimsMapping_list_' + target.key}">
+                                    <option th:value="${target.defaultClaimName}"></option>
+                                </datalist>
+                                <div class="form-text">
+                                    <span th:text="#{system.oidcProviders.claimsMapping.hint.default}">デフォルト</span>:
+                                    <code th:text="${target.defaultClaimName}">family_name</code>
+                                </div>
+                            </div>
+
+                            <div class="alert alert-light border small mb-0">
+                                <i class="bi bi-info-circle me-1"></i>
+                                <span th:text="#{system.oidcProviders.claimsMapping.help.unmapped}">
+                                    空欄にするとデフォルトクレーム名が使われます。
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- 接続確認エリア -->
                     <div class="card mb-3">
                         <div class="card-body">

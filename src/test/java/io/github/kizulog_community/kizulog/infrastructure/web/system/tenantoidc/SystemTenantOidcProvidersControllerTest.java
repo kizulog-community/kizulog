@@ -124,7 +124,8 @@ class SystemTenantOidcProvidersControllerTest {
                 null,
                 BASE_TIME,
                 "creator",
-                List.of());
+                List.of(),
+                java.util.Map.of());
     }
 
     private EnabledTenantOidcProviderView enabledViewOf(String providerId) {
@@ -251,7 +252,7 @@ class SystemTenantOidcProvidersControllerTest {
                 .isEqualTo("system.tenants.oidc.register.success");
         verify(tenantOidcProviderService).registerProvider(
                 TENANT_ID, PROVIDER_ID, "Google Workspace",
-                "https://iss", "aud", "cid", "secret", "Setup", "operator-1");
+                "https://iss", "aud", "cid", "secret", java.util.Map.of(), "Setup", "operator-1");
     }
 
     @Test
@@ -266,7 +267,7 @@ class SystemTenantOidcProvidersControllerTest {
         assertThat(view).isEqualTo(
                 "redirect:/system/tenants/" + TENANT_ID + "/oidc-providers/new");
         verify(tenantOidcProviderService, never()).registerProvider(
-                any(), any(), any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -284,7 +285,7 @@ class SystemTenantOidcProvidersControllerTest {
         doThrow(new TenantOidcProviderRegistrationException(
                 TenantOidcProviderRegistrationError.PROVIDER_ID_DUPLICATE))
                 .when(tenantOidcProviderService).registerProvider(
-                        any(), any(), any(), any(), any(), any(), any(), any(), any());
+                        any(), any(), any(), any(), any(), any(), any(), any(), any(), any());
 
         String view = controller.register(
                 TENANT_ID, form, br, principal, Locale.JAPAN, redirectAttrs);
@@ -311,7 +312,7 @@ class SystemTenantOidcProvidersControllerTest {
                 TENANT_ID, form, br, null, Locale.JAPAN, redirectAttrs);
 
         verify(tenantOidcProviderService).registerProvider(
-                any(), any(), any(), any(), any(), any(), any(), any(),
+                any(), any(), any(), any(), any(), any(), any(), any(), any(),
                 org.mockito.ArgumentMatchers.eq("system"));
     }
 
@@ -445,7 +446,7 @@ class SystemTenantOidcProvidersControllerTest {
                 "redirect:/system/tenants/" + TENANT_ID + "/oidc-providers/" + PROVIDER_ID);
         verify(tenantOidcProviderService).updateProvider(
                 TENANT_ID, PROVIDER_ID, "Updated Name", "new-cid", "",
-                "Updating", "operator-1");
+                java.util.Map.of(), "Updating", "operator-1");
     }
 
     @Test
@@ -461,7 +462,7 @@ class SystemTenantOidcProvidersControllerTest {
                 "redirect:/system/tenants/" + TENANT_ID
                         + "/oidc-providers/" + PROVIDER_ID + "/edit");
         verify(tenantOidcProviderService, never()).updateProvider(
-                any(), any(), any(), any(), any(), any(), any());
+                any(), any(), any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -475,7 +476,7 @@ class SystemTenantOidcProvidersControllerTest {
         doThrow(new TenantOidcProviderUpdateException(
                 TenantOidcProviderUpdateError.PROVIDER_NOT_FOUND))
                 .when(tenantOidcProviderService).updateProvider(
-                        any(), any(), any(), any(), any(), any(), any());
+                        any(), any(), any(), any(), any(), any(), any(), any());
 
         String view = controller.update(
                 TENANT_ID, PROVIDER_ID, form, br, principal, Locale.JAPAN, redirectAttrs);

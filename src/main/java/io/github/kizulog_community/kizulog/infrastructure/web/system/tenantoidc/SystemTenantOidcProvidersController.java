@@ -28,6 +28,7 @@ import io.github.kizulog_community.kizulog.domain.tenant.service.TenantManagemen
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderRegistrationException;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderStatusChangeException;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateException;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.EnabledTenantOidcProviderView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderDetailView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProviderListItemView;
@@ -123,9 +124,12 @@ public class SystemTenantOidcProvidersController {
         model.addAttribute("activeMenu", "tenants");
         model.addAttribute("tenant", tenantOpt.get());
         if (!model.containsAttribute("registrationForm")) {
-            model.addAttribute("registrationForm",
-                    new TenantOidcProviderRegistrationForm());
+            TenantOidcProviderRegistrationForm form =
+                    new TenantOidcProviderRegistrationForm();
+            form.ensureDefaults();
+            model.addAttribute("registrationForm", form);
         }
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
         return "system/tenants/oidc-providers/new";
     }
 
@@ -159,6 +163,7 @@ public class SystemTenantOidcProvidersController {
                     form.getAud(),
                     form.getClientId(),
                     form.getClientSecret(),
+                    form.getClaimsMapping(),
                     form.getReason(),
                     operatorId);
         } catch (TenantOidcProviderRegistrationException e) {
@@ -228,6 +233,7 @@ public class SystemTenantOidcProvidersController {
         model.addAttribute("tenant", tenantOpt.get());
         model.addAttribute("provider", provider);
         model.addAttribute("isLastEnabled", isLastEnabled);
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
         if (!model.containsAttribute("statusChangeForm")) {
             model.addAttribute("statusChangeForm",
                     new TenantOidcProviderStatusChangeForm());
@@ -270,8 +276,10 @@ public class SystemTenantOidcProvidersController {
             form.setDisplayName(providerOpt.get().getDisplayName());
             form.setClientId(providerOpt.get().getClientId());
             // clientSecret は表示しない（空のまま）
+            form.populateFromExisting(providerOpt.get().getClaimsMappingView());
             model.addAttribute("editForm", form);
         }
+        model.addAttribute("claimsMappingTargets", ClaimsMappingTarget.orderedList());
         return "system/tenants/oidc-providers/edit";
     }
 
@@ -305,6 +313,7 @@ public class SystemTenantOidcProvidersController {
                     form.getDisplayName(),
                     form.getClientId(),
                     form.getClientSecret(),
+                    form.getClaimsMapping(),
                     form.getReason(),
                     operatorId);
         } catch (TenantOidcProviderUpdateException e) {

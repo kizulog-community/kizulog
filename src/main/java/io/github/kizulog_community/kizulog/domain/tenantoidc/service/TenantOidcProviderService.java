@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
@@ -21,6 +22,7 @@ import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOid
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateError;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.exception.TenantOidcProviderUpdateException;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
+import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingValidator;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.DecryptedTenantOidcProvider;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.EnabledTenantOidcProviderView;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
@@ -45,12 +47,10 @@ import lombok.RequiredArgsConstructor;
 public class TenantOidcProviderService {
 
     /** provider_id 形式: 半角小文字英数字とハイフン、1-32文字 */
-    private static final Pattern PROVIDER_ID_PATTERN =
-            Pattern.compile("^[a-z0-9-]{1,32}$");
+    private static final Pattern PROVIDER_ID_PATTERN = Pattern.compile("^[a-z0-9-]{1,32}$");
 
     /** iss URI 形式: http:// または https:// で始まる */
-    private static final Pattern ISS_URI_PATTERN =
-            Pattern.compile("^https?://.+$");
+    private static final Pattern ISS_URI_PATTERN = Pattern.compile("^https?://.+$");
 
     /** display_name 最大長 */
     private static final int DISPLAY_NAME_MAX_LENGTH = 100;
@@ -154,7 +154,8 @@ public class TenantOidcProviderService {
                 currentStatusOpt.map(TenantOidcProviderStatus::getReason).orElse(null),
                 currentStatusOpt.map(TenantOidcProviderStatus::getVersion).orElse(null),
                 currentStatusOpt.map(TenantOidcProviderStatus::getCreatedBy).orElse(null),
-                historyEntries));
+                historyEntries,
+                provider.getClaimsMappingView()));
     }
 
     /**
@@ -258,7 +259,7 @@ public class TenantOidcProviderService {
     }
 
     /**
-     * 新規プロバイダーを登録する。
+     * 新規プロバイダーを登録する（クレームマッピング指定なし＝デフォルト適用）。
      *
      * @param tenantId テナントID
      * @param providerId プロバイダー識別子
@@ -279,6 +280,36 @@ public class TenantOidcProviderService {
             String aud,
             String clientId,
             String plainClientSecret,
+            String reason,
+            String operatorId) {
+        registerProvider(tenantId, providerId, displayName, iss, aud,
+                clientId, plainClientSecret, null, reason, operatorId);
+    }
+
+    /**
+     * 新規プロバイダーを登録する。
+     *
+     * @param tenantId テナントID
+     * @param providerId プロバイダー識別子
+     * @param displayName 表示名
+     * @param iss OIDC Issuer URI
+     * @param aud Audience
+     * @param clientId クライアントID
+     * @param plainClientSecret 平文クライアントシークレット
+     * @param claimsMapping クレームマッピング（null/空の場合はデフォルトを適用）
+     * @param reason 登録理由
+     * @param operatorId 操作者accountId
+     */
+    @Transactional
+    public void registerProvider(
+            String tenantId,
+            String providerId,
+            String displayName,
+            String iss,
+            String aud,
+            String clientId,
+            String plainClientSecret,
+            Map<String, String> claimsMapping,
             String reason,
             String operatorId) {
 
@@ -317,12 +348,10 @@ public class TenantOidcProviderService {
         String encryptedSecret = cryptoPort.encrypt(plainClientSecret);
 
         // プロバイダー本体保存
-        // claims_mapping は登録時点ではデフォルトマッピング（DBデフォルトと一致）。
-        // 個別マッピングの編集UIは Phase 6 で追加し、本メソッドを引数化する。
         TenantOidcProvider provider = new TenantOidcProvider(
                 tenantId, providerId, now,
                 displayName, iss, aud, clientId, encryptedSecret,
-                ClaimsMappingTarget.defaultMapping(),
+                normalizeForRegister(claimsMapping),
                 now, "system:tenant-oidc-register:" + operatorId);
         providerRepository.save(provider);
 
@@ -336,7 +365,7 @@ public class TenantOidcProviderService {
     }
 
     /**
-     * プロバイダーの編集可能項目（display_name / client_id / client_secret）を更新する。
+     * プロバイダーの編集可能項目を更新する（クレームマッピング指定なし＝現状維持）。
      *
      * @param tenantId テナントID
      * @param providerId プロバイダー識別子
@@ -353,6 +382,32 @@ public class TenantOidcProviderService {
             String displayName,
             String clientId,
             String plainClientSecret,
+            String reason,
+            String operatorId) {
+        updateProvider(tenantId, providerId, displayName, clientId,
+                plainClientSecret, null, reason, operatorId);
+    }
+
+    /**
+     * プロバイダーの編集可能項目（display_name / client_id / client_secret / claims_mapping）を更新する。
+     *
+     * @param tenantId テナントID
+     * @param providerId プロバイダー識別子
+     * @param displayName 新しい表示名
+     * @param clientId 新しいクライアントID
+     * @param plainClientSecret 新しい平文クライアントシークレット（null/空なら現在値維持）
+     * @param claimsMapping 新しいクレームマッピング（null/空なら現在値維持）
+     * @param reason 変更理由
+     * @param operatorId 操作者accountId
+     */
+    @Transactional
+    public void updateProvider(
+            String tenantId,
+            String providerId,
+            String displayName,
+            String clientId,
+            String plainClientSecret,
+            Map<String, String> claimsMapping,
             String reason,
             String operatorId) {
 
@@ -391,7 +446,7 @@ public class TenantOidcProviderService {
                 tenantId, providerId, now,
                 displayName, current.getIss(), current.getAud(),
                 clientId, encryptedSecret,
-                current.getClaimsMappingCopy(),
+                resolveForUpdate(claimsMapping, current),
                 now, "system:tenant-oidc-update:" + operatorId);
         providerRepository.save(updated);
     }
@@ -564,6 +619,36 @@ public class TenantOidcProviderService {
                 || reason.length() > REASON_MAX_LENGTH) {
             throw new TenantOidcProviderStatusChangeException(error);
         }
+    }
+
+    /**
+     * 登録用にクレームマッピングを正規化する。空の場合はデフォルトを返す。
+     *
+     * @param input フォーム入力のマッピング（null可）
+     * @return 正規化済みマッピング（空ならデフォルト）
+     */
+    private static Map<String, String> normalizeForRegister(Map<String, String> input) {
+        Map<String, String> normalized = ClaimsMappingValidator.normalize(input);
+        if (ClaimsMappingValidator.isEmpty(normalized)) {
+            return ClaimsMappingTarget.defaultMapping();
+        }
+        return normalized;
+    }
+
+    /**
+     * 更新用にクレームマッピングを解決する。空の場合は現在値を維持する。
+     *
+     * @param input フォーム入力のマッピング（null可）
+     * @param current 現在のプロバイダー
+     * @return 正規化済みマッピング（空なら現在値のコピー）
+     */
+    private static Map<String, String> resolveForUpdate(
+            Map<String, String> input, TenantOidcProvider current) {
+        Map<String, String> normalized = ClaimsMappingValidator.normalize(input);
+        if (ClaimsMappingValidator.isEmpty(normalized)) {
+            return current.getClaimsMappingCopy();
+        }
+        return normalized;
     }
 
 }
