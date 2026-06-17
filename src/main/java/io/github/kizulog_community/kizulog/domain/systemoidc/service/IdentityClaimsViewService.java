@@ -15,8 +15,6 @@ import io.github.kizulog_community.kizulog.domain.systemaccount.port.SystemAccou
 import io.github.kizulog_community.kizulog.domain.systemaccountprofile.model.SystemAccountProfile;
 import io.github.kizulog_community.kizulog.domain.systemaccountprofile.service.SystemAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
-import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
-import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
 import lombok.RequiredArgsConstructor;
 
 /**
@@ -31,14 +29,8 @@ public class IdentityClaimsViewService {
     /** Identityリポジトリ */
     private final SystemAccountIdentityRepository identityRepository;
 
-    /** Providerリポジトリ */
-    private final SystemOidcProviderRepository providerRepository;
-
-    /** Profileサービス（クレームキャッシュ取得用） */
+    /** Profileサービス（解決済みプロファイル取得用） */
     private final SystemAccountProfileService profileService;
-
-    /** クレームマッピング解決 */
-    private final ClaimsMappingResolver claimsMappingResolver;
 
     /** メッセージソース（ラベル国際化用） */
     private final MessageSource messageSource;
@@ -149,17 +141,10 @@ public class IdentityClaimsViewService {
      * SystemAccountIdentity 単位のクレーム表示マップ解決。
      *
      * @param identity Identity
-     * @return クレーム表示マップ
+     * @return クレーム表示マップ（ターゲットキー→値）
      */
     private Map<String, String> resolveClaimsViewForIdentity(SystemAccountIdentity identity) {
-        String iss = identity.getIss();
         String identityId = identity.getIdentityId();
-
-        Optional<SystemOidcProvider> providerOpt = findProviderByIss(iss);
-        if (providerOpt.isEmpty()) {
-            return Map.of();
-        }
-        SystemOidcProvider provider = providerOpt.get();
 
         Optional<SystemAccountProfile> profileOpt = profileService.getProfile(identityId);
         if (profileOpt.isEmpty()) {
@@ -172,37 +157,12 @@ public class IdentityClaimsViewService {
 
         Map<String, String> result = new LinkedHashMap<>();
         for (ClaimsMappingTarget target : ClaimsMappingTarget.values()) {
-            String value = claimsMappingResolver.resolveOne(provider, claims, target);
-            if (value != null && !value.isBlank()) {
-                result.put(target.getKey(), value);
+            Object value = claims.get(target.getKey());
+            if (value != null && !value.toString().isBlank()) {
+                result.put(target.getKey(), value.toString());
             }
         }
         return result;
-    }
-
-    /**
-     * iss URI から OIDC プロバイダを特定する。
-     *
-     * @param iss issuer URI
-     * @return マッチしたプロバイダ（無ければOptional.empty）
-     */
-    private Optional<SystemOidcProvider> findProviderByIss(String iss) {
-        if (iss == null) {
-            return Optional.empty();
-        }
-        String normalizedIss = iss.replaceAll("/+$", "");
-
-        List<SystemOidcProvider> all = providerRepository.findAllLatest();
-        for (SystemOidcProvider p : all) {
-            if (p.getUri() == null) {
-                continue;
-            }
-            String normalizedUri = p.getUri().replaceAll("/+$", "");
-            if (normalizedUri.equals(normalizedIss)) {
-                return Optional.of(p);
-            }
-        }
-        return Optional.empty();
     }
 
 }

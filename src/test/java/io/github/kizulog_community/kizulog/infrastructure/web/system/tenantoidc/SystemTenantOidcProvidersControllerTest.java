@@ -243,6 +243,9 @@ class SystemTenantOidcProvidersControllerTest {
         form.setReason("Setup");
         BindingResult br = bindingResultOf(form, "registrationForm");
 
+        when(oidcProviderService.resolveCanonicalIssuer("https://iss"))
+                .thenReturn("https://iss");
+
         String view = controller.register(
                 TENANT_ID, form, br, principal, Locale.JAPAN, redirectAttrs);
 

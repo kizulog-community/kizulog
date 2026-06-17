@@ -67,7 +67,7 @@ class TenantOidcUserServiceTest {
     private TenantAdminInvitationService invitationService;
     private TenantInvitationAcceptanceSession invitationSession;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
-    private OidcClaimsFilter claimsFilter;
+    private TenantProfileClaimsResolver profileClaimsResolver;
     private TenantAccountProfileService profileService;
     private TenantOidcUserService sut;
 
@@ -83,17 +83,18 @@ class TenantOidcUserServiceTest {
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
                 mock(OAuth2UserService.class);
         delegate = mockDelegate;
-        claimsFilter = mock(OidcClaimsFilter.class);
+        profileClaimsResolver = mock(TenantProfileClaimsResolver.class);
         profileService = mock(TenantAccountProfileService.class);
-        // 既定ではフィルタ結果を空にし、プロファイル保存は呼ばれないようにする
-        when(claimsFilter.filter(any())).thenReturn(java.util.Collections.emptyMap());
+        // 既定では解決結果を空にし、プロファイル保存は呼ばれないようにする
+        when(profileClaimsResolver.resolveForStorage(any(), any(), any(), any()))
+                .thenReturn(java.util.Collections.emptyMap());
         sut = new TenantOidcUserService(
                 authService,
                 identityRepository,
                 acceptanceService,
                 invitationService,
                 invitationSession,
-                claimsFilter,
+                profileClaimsResolver,
                 profileService,
                 delegate);
     }

@@ -80,8 +80,8 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
     /** 招待受諾セッション（sessionスコープProxy Bean） */
     private final TenantInvitationAcceptanceSession invitationSession;
 
-    /** OIDCクレームフィルタ（ホワイトリスト） */
-    private final OidcClaimsFilter claimsFilter;
+    /** プロファイル保存値Resolver（マッピング解決→ターゲットキーMap化） */
+    private final TenantProfileClaimsResolver profileClaimsResolver;
 
     /** プロファイルキャッシュService */
     private final TenantAccountProfileService profileService;
@@ -97,7 +97,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
      * @param tenantAdminAcceptanceService 招待受諾オーケストレーションサービス
      * @param invitationService 招待管理サービス
      * @param invitationSession 招待受諾セッション
-     * @param claimsFilter OIDCクレームフィルタ（ホワイトリスト）
+     * @param profileClaimsResolver プロファイル保存値Resolver
      * @param profileService プロファイルキャッシュService
      */
     @Autowired
@@ -107,7 +107,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
             TenantAdminAcceptanceService tenantAdminAcceptanceService,
             TenantAdminInvitationService invitationService,
             TenantInvitationAcceptanceSession invitationSession,
-            OidcClaimsFilter claimsFilter,
+            TenantProfileClaimsResolver profileClaimsResolver,
             TenantAccountProfileService profileService) {
         this(
                 tenantAuthenticationService,
@@ -115,7 +115,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
                 tenantAdminAcceptanceService,
                 invitationService,
                 invitationSession,
-                claimsFilter,
+                profileClaimsResolver,
                 profileService,
                 new OidcUserService());
     }
@@ -128,7 +128,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
      * @param tenantAdminAcceptanceService 招待受諾オーケストレーションサービス
      * @param invitationService 招待管理サービス
      * @param invitationSession 招待受諾セッション
-     * @param claimsFilter OIDCクレームフィルタ（ホワイトリスト）
+     * @param profileClaimsResolver プロファイル保存値Resolver
      * @param profileService プロファイルキャッシュService
      * @param delegate Spring標準OidcUserService
      */
@@ -138,7 +138,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
             TenantAdminAcceptanceService tenantAdminAcceptanceService,
             TenantAdminInvitationService invitationService,
             TenantInvitationAcceptanceSession invitationSession,
-            OidcClaimsFilter claimsFilter,
+            TenantProfileClaimsResolver profileClaimsResolver,
             TenantAccountProfileService profileService,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.tenantAuthenticationService = tenantAuthenticationService;
@@ -146,7 +146,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
         this.tenantAdminAcceptanceService = tenantAdminAcceptanceService;
         this.invitationService = invitationService;
         this.invitationSession = invitationSession;
-        this.claimsFilter = claimsFilter;
+        this.profileClaimsResolver = profileClaimsResolver;
         this.profileService = profileService;
         this.delegate = delegate;
     }
@@ -196,7 +196,7 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
         }
 
         // 5) U.0: プロファイル更新（fail-open）
-        updateProfileCache(identity, oidcUser, sub);
+        updateProfileCache(identity, oidcUser, tenantId, iss, aud, sub);
 
         // 6) TenantUserPrincipalを生成してSpring Securityに返却
         return TenantUserPrincipal.ofTenantUser(
@@ -213,20 +213,26 @@ public class TenantOidcUserService implements OAuth2UserService<OidcUserRequest,
     /**
      * プロファイルキャッシュを更新する（fail-open）。
      *
-     * <p>ホワイトリストフィルタ後のクレームを tenant_account_profiles に
-     * 差分があった場合のみ新バージョンとして保存する。
+     * <p>テナントOIDCプロバイダの claimsMapping に従って生クレームを5項目（氏・名・ミドル・所属・email）へ解決し、
+     * ターゲットキー→値のMapとして tenant_account_profiles に差分があった場合のみ新バージョンとして保存する。
+     * 生のOIDCクレームは保存しない。
      * キャッシュ更新の失敗はログのみで握りつぶし、認証自体は継続させる。</p>
      *
      * @param identity 認証成功したidentity
      * @param oidcUser OIDCユーザ情報
+     * @param tenantId テナントID（プロバイダ特定に使用）
+     * @param iss 認証元の issuer（プロバイダ特定に使用）
+     * @param aud 認証元の audience（プロバイダ特定に使用）
      * @param sub createdBy として記録する値
      */
     private void updateProfileCache(
-            TenantAccountIdentity identity, OidcUser oidcUser, String sub) {
+            TenantAccountIdentity identity, OidcUser oidcUser,
+            String tenantId, String iss, String aud, String sub) {
         try {
-            var filtered = claimsFilter.filter(oidcUser.getClaims());
-            if (!filtered.isEmpty()) {
-                profileService.upsertIfChanged(identity.getIdentityId(), filtered, sub);
+            var resolved = profileClaimsResolver.resolveForStorage(
+                    tenantId, iss, aud, oidcUser.getClaims());
+            if (!resolved.isEmpty()) {
+                profileService.upsertIfChanged(identity.getIdentityId(), resolved, sub);
             }
         } catch (RuntimeException e) {
             log.warn("Failed to update tenant profile cache: identityId={}, error={}",

@@ -231,6 +231,9 @@ class OidcProvidersControllerTest {
         form.setClientSecret("s");
         BindingResult br = new BeanPropertyBindingResult(form, "oidcProviderForm");
 
+        when(oidcProviderService.resolveCanonicalIssuer("https://example.com"))
+                .thenReturn("https://example.com");
+
         String view = controller.create(form, br, principal,
                 Locale.JAPAN, redirectAttrs, model);
 
@@ -267,7 +270,7 @@ class OidcProvidersControllerTest {
         BindingResult br = new BeanPropertyBindingResult(form, "oidcProviderForm");
 
         doThrow(new OidcConnectionException(OidcConnectionError.CONNECTION_ERROR))
-                .when(oidcProviderService).verify("https://bad.example.com");
+                .when(oidcProviderService).resolveCanonicalIssuer("https://bad.example.com");
 
         String view = controller.create(form, br, principal,
                 Locale.JAPAN, redirectAttrs, model);

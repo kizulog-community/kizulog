@@ -58,8 +58,8 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
     /** identityリンクセッション(sessionスコープProxy Bean) */
     private final IdentityLinkSession identityLinkSession;
 
-    /** OIDCクレームフィルタ（ホワイトリスト） */
-    private final OidcClaimsFilter claimsFilter;
+    /** プロファイル保存値Resolver（マッピング解決→ターゲットキーMap化） */
+    private final SystemProfileClaimsResolver profileClaimsResolver;
 
     /** プロファイルキャッシュService */
     private final SystemAccountProfileService profileService;
@@ -79,7 +79,7 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAccountIdentityLinkService identityLinkService,
             InvitationAcceptanceSession invitationSession,
             IdentityLinkSession identityLinkSession,
-            OidcClaimsFilter claimsFilter,
+            SystemProfileClaimsResolver profileClaimsResolver,
             SystemAccountProfileService profileService) {
         this(
                 systemAuthenticationService,
@@ -89,7 +89,7 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
                 identityLinkService,
                 invitationSession,
                 identityLinkSession,
-                claimsFilter,
+                profileClaimsResolver,
                 profileService,
                 new OidcUserService());
     }
@@ -105,7 +105,7 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
             SystemAccountIdentityLinkService identityLinkService,
             InvitationAcceptanceSession invitationSession,
             IdentityLinkSession identityLinkSession,
-            OidcClaimsFilter claimsFilter,
+            SystemProfileClaimsResolver profileClaimsResolver,
             SystemAccountProfileService profileService,
             OAuth2UserService<OidcUserRequest, OidcUser> delegate) {
         this.systemAuthenticationService = systemAuthenticationService;
@@ -115,7 +115,7 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
         this.identityLinkService = identityLinkService;
         this.invitationSession = invitationSession;
         this.identityLinkSession = identityLinkSession;
-        this.claimsFilter = claimsFilter;
+        this.profileClaimsResolver = profileClaimsResolver;
         this.profileService = profileService;
         this.delegate = delegate;
     }
@@ -144,7 +144,7 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
         }
 
         // 4) R.0: プロファイル更新（fail-open）
-        updateProfileCache(identity, oidcUser, sub);
+        updateProfileCache(identity, oidcUser, iss, sub);
 
         // 5) SystemUserPrincipalを生成してSpring Securityに返却
         return SystemUserPrincipal.ofSystemAdmin(
@@ -159,16 +159,21 @@ public class SystemOidcUserService implements OAuth2UserService<OidcUserRequest,
     /**
      * プロファイルキャッシュを更新する。
      *
+     * <p>OIDCプロバイダの claimsMapping に従って生クレームを5項目（氏・名・ミドル・
+     * 所属・email）へ解決し、ターゲットキー→値のMapとして保存する。生のOIDCクレームは
+     * 保存しない。差分があった場合のみ新バージョンを保存する。失敗はログのみで握りつぶす。</p>
+     *
      * @param identity 認証成功したidentity
      * @param oidcUser OIDCユーザ情報
+     * @param iss 認証元の issuer（プロバイダ特定に使用）
      * @param sub createdBy として記録する値
      */
     private void updateProfileCache(
-            SystemAccountIdentity identity, OidcUser oidcUser, String sub) {
+            SystemAccountIdentity identity, OidcUser oidcUser, String iss, String sub) {
         try {
-            var filtered = claimsFilter.filter(oidcUser.getClaims());
-            if (!filtered.isEmpty()) {
-                profileService.upsertIfChanged(identity.getIdentityId(), filtered, sub);
+            var resolved = profileClaimsResolver.resolveForStorage(iss, oidcUser.getClaims());
+            if (!resolved.isEmpty()) {
+                profileService.upsertIfChanged(identity.getIdentityId(), resolved, sub);
             }
         } catch (RuntimeException e) {
             log.warn("Failed to update profile cache: identityId={}, error={}",

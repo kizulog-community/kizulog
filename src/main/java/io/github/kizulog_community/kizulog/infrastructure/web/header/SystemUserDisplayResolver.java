@@ -10,14 +10,14 @@ import org.springframework.stereotype.Component;
 import io.github.kizulog_community.kizulog.domain.systemaccountprofile.model.SystemAccountProfile;
 import io.github.kizulog_community.kizulog.domain.systemaccountprofile.service.SystemAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.systemoidc.model.ClaimsMappingTarget;
-import io.github.kizulog_community.kizulog.domain.systemoidc.model.SystemOidcProvider;
-import io.github.kizulog_community.kizulog.domain.systemoidc.port.SystemOidcProviderRepository;
-import io.github.kizulog_community.kizulog.domain.systemoidc.service.ClaimsMappingResolver;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.SystemUserPrincipal;
 import lombok.RequiredArgsConstructor;
 
 /**
  * システム管理画面ヘッダ用ユーザ表示Resolver
+ *
+ * <p>プロファイルにはログイン時にマッピング解決済みの値（ターゲットキー→値）が保存されているため、
+ * ここではプロバイダ参照やマッピング適用を行わず、保存値を直接読み出して表示Viewを構築する。</p>
  *
  * @author Jun Kobayashi
  */
@@ -30,12 +30,6 @@ public class SystemUserDisplayResolver {
     /** プロファイルキャッシュService */
     private final SystemAccountProfileService profileService;
 
-    /** OIDCプロバイダリポジトリ */
-    private final SystemOidcProviderRepository providerRepository;
-
-    /** クレームマッピング解決Service */
-    private final ClaimsMappingResolver claimsMappingResolver;
-
     /**
      * Principalから表示用Viewを構築する。
      *
@@ -47,34 +41,21 @@ public class SystemUserDisplayResolver {
             return emptyView();
         }
 
-        // identity の最新プロファイルを取得
         Map<String, Object> claims = loadClaimsForIdentity(principal.getIdentityId());
 
-        // identity が属する provider を引く
-        SystemOidcProvider provider = findProviderForIdentity(principal);
-        if (provider == null) {
-            log.debug("No provider found for identity: identityId={}, iss={}",
-                    principal.getIdentityId(), principal.getIss());
-            return emptyView();
-        }
-
-        // マッピング適用
-        Map<ClaimsMappingTarget, String> resolved =
-                claimsMappingResolver.resolve(provider, claims);
-
         return new SystemUserDisplayView(
-                resolved.get(ClaimsMappingTarget.FAMILY_NAME),
-                resolved.get(ClaimsMappingTarget.GIVEN_NAME),
-                resolved.get(ClaimsMappingTarget.MIDDLE_NAME),
-                resolved.get(ClaimsMappingTarget.ORGANIZATION),
-                resolved.get(ClaimsMappingTarget.EMAIL));
+                value(claims, ClaimsMappingTarget.FAMILY_NAME),
+                value(claims, ClaimsMappingTarget.GIVEN_NAME),
+                value(claims, ClaimsMappingTarget.MIDDLE_NAME),
+                value(claims, ClaimsMappingTarget.ORGANIZATION),
+                value(claims, ClaimsMappingTarget.EMAIL));
     }
 
     /**
-     * identity のキャッシュ済みクレームを取得する。
+     * identity の解決済みプロファイル（ターゲットキー→値）を取得する。
      *
      * @param identityId identity ID
-     * @return クレームMap、または取得失敗時の空Map
+     * @return 保存値Map、または取得失敗時の空Map
      */
     private Map<String, Object> loadClaimsForIdentity(String identityId) {
         if (identityId == null) {
@@ -92,50 +73,22 @@ public class SystemUserDisplayResolver {
     }
 
     /**
-     * identity が属するOIDCプロバイダを特定する。
+     * 解決済みプロファイルから指定ターゲットの値を取り出す。
      *
-     * @param principal 現在のPrincipal
-     * @return プロバイダ、または該当なしの場合 null
+     * @param claims 解決済みプロファイル（ターゲットキー→値）
+     * @param target 取得対象
+     * @return 値（非空白）、または該当なしの場合 null
      */
-    private SystemOidcProvider findProviderForIdentity(SystemUserPrincipal principal) {
-        String iss = principal.getIss();
-        if (iss == null) {
+    private static String value(Map<String, Object> claims, ClaimsMappingTarget target) {
+        if (claims == null) {
             return null;
         }
-        try {
-            return providerRepository.findAllLatest().stream()
-                    .filter(p -> matchesIss(p, iss))
-                    .findFirst()
-                    .orElse(null);
-        } catch (RuntimeException e) {
-            log.warn("Failed to find provider for identity: identityId={}, iss={}, error={}",
-                    principal.getIdentityId(), iss, e.getMessage());
+        Object v = claims.get(target.getKey());
+        if (v == null) {
             return null;
         }
-    }
-
-    /**
-     * プロバイダのURIがissと一致するか判定する。
-     *
-     * @param provider プロバイダ
-     * @param iss 認証元のiss
-     * @return 一致する場合true
-     */
-    private boolean matchesIss(SystemOidcProvider provider, String iss) {
-        if (provider == null || provider.getUri() == null || iss == null) {
-            return false;
-        }
-        return trimSlash(provider.getUri()).equals(trimSlash(iss));
-    }
-
-    private static String trimSlash(String s) {
-        if (s == null) {
-            return null;
-        }
-        if (s.endsWith("/")) {
-            return s.substring(0, s.length() - 1);
-        }
-        return s;
+        String s = v.toString();
+        return s.isBlank() ? null : s;
     }
 
     private SystemUserDisplayView emptyView() {

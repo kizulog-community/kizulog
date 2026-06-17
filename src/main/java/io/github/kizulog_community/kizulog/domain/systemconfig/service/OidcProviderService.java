@@ -91,6 +91,32 @@ public class OidcProviderService {
     }
 
     /**
+     * 入力 Issuer URI からディスカバリを引き、OP が宣言する正準 issuer を返す。
+     *
+     * <p>OpenID Connect では iss は不透明な識別子で、ID Token の iss と OP メタデータの
+     * issuer は完全一致（コードポイント等価、末尾スラッシュの有無も区別）が要求される。
+     * したがって管理者の入力値をそのまま保存・照合するのではなく、本メソッドが返す
+     * 「OP が宣言する issuer」を正準値として保存・照合に用いることで、表記揺れ
+     * （末尾スラッシュ等）による不一致を構造的に防ぐ。</p>
+     *
+     * @param issuerUri 入力 Issuer URI
+     * @return メタデータの issuer フィールド値（正準 issuer）
+     * @throws OidcConnectionException 接続失敗、または issuer が取得できない場合
+     */
+    public String resolveCanonicalIssuer(String issuerUri) {
+        if (issuerUri == null || issuerUri.isBlank()) {
+            throw new OidcConnectionException(OidcConnectionError.INPUT_ERROR);
+        }
+        Map<String, Object> metadata = getMetadata(issuerUri);
+        Object issuer = metadata.get("issuer");
+        if (!(issuer instanceof String) || ((String) issuer).isBlank()) {
+            log.warn("OIDCメタデータにissuerが含まれていません: issuerUri={}", issuerUri);
+            throw new OidcConnectionException(OidcConnectionError.INVALID_RESPONSE);
+        }
+        return ((String) issuer).trim();
+    }
+
+    /**
      * stateパラメーターを生成
      *
      * @return ランダムなstate文字列

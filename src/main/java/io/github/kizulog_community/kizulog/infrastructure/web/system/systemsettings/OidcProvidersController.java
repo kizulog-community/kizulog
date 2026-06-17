@@ -151,8 +151,9 @@ public class OidcProvidersController {
             return "system/system-settings/oidc-providers/new";
         }
 
+        String canonicalIss;
         try {
-            oidcProviderService.verify(form.getUri());
+            canonicalIss = oidcProviderService.resolveCanonicalIssuer(form.getUri());
         } catch (OidcConnectionException e) {
             String errorMessage = messageSource.getMessage(
                     "system.oidcProviders.connection.error." + e.getErrorType().name(),
@@ -169,7 +170,7 @@ public class OidcProvidersController {
             systemOidcProviderService.registerWithValidation(
                     form.getProviderId(),
                     form.getDisplayName(),
-                    form.getUri(),
+                    canonicalIss,
                     form.getClientId(),
                     form.getClientSecret(),
                     form.getClaimsMapping(),

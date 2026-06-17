@@ -154,12 +154,29 @@ public class SystemTenantOidcProvidersController {
         }
 
         String operatorId = (principal != null) ? principal.getAccountId() : "system";
+
+        String canonicalIss;
+        try {
+            canonicalIss = oidcProviderService.resolveCanonicalIssuer(form.getIss());
+        } catch (OidcConnectionException e) {
+            log.warn("テナントOIDCプロバイダー登録の接続確認に失敗: tenantId={}, errorType={}",
+                    tId, e.getErrorType());
+            String errorMessage = messageSource.getMessage(
+                    "system.oidcProviders.connection.error." + e.getErrorType().name(),
+                    null,
+                    "Connection failed",
+                    locale);
+            redirectAttrs.addFlashAttribute("flashErrorMessage", errorMessage);
+            redirectAttrs.addFlashAttribute("registrationForm", form);
+            return "redirect:/system/tenants/" + tId + "/oidc-providers/new";
+        }
+
         try {
             tenantOidcProviderService.registerProvider(
                     tId,
                     form.getProviderId(),
                     form.getDisplayName(),
-                    form.getIss(),
+                    canonicalIss,
                     form.getAud(),
                     form.getClientId(),
                     form.getClientSecret(),

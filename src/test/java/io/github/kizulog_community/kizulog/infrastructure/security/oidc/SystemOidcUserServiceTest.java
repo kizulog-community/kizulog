@@ -68,7 +68,7 @@ class SystemOidcUserServiceTest {
     private SystemAccountIdentityLinkService identityLinkService;
     private InvitationAcceptanceSession invitationSession;
     private IdentityLinkSession identityLinkSession;
-    private OidcClaimsFilter claimsFilter;
+    private SystemProfileClaimsResolver profileClaimsResolver;
     private SystemAccountProfileService profileService;
     private OAuth2UserService<OidcUserRequest, OidcUser> delegate;
     private SystemOidcUserService sut;
@@ -82,7 +82,7 @@ class SystemOidcUserServiceTest {
         identityLinkService = mock(SystemAccountIdentityLinkService.class);
         invitationSession = mock(InvitationAcceptanceSession.class);
         identityLinkSession = mock(IdentityLinkSession.class);
-        claimsFilter = mock(OidcClaimsFilter.class);
+        profileClaimsResolver = mock(SystemProfileClaimsResolver.class);
         profileService = mock(SystemAccountProfileService.class);
         @SuppressWarnings("unchecked")
         OAuth2UserService<OidcUserRequest, OidcUser> mockDelegate =
@@ -91,7 +91,8 @@ class SystemOidcUserServiceTest {
 
         when(invitationSession.isPending()).thenReturn(false);
         when(identityLinkSession.isPending()).thenReturn(false);
-        when(claimsFilter.filter(any())).thenReturn(java.util.Collections.emptyMap());
+        when(profileClaimsResolver.resolveForStorage(any(), any()))
+                .thenReturn(java.util.Collections.emptyMap());
 
         sut = new SystemOidcUserService(
                 authService,
@@ -101,7 +102,7 @@ class SystemOidcUserServiceTest {
                 identityLinkService,
                 invitationSession,
                 identityLinkSession,
-                claimsFilter,
+                profileClaimsResolver,
                 profileService,
                 delegate);
     }

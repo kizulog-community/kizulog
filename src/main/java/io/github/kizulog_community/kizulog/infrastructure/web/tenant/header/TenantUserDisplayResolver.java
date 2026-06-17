@@ -10,14 +10,15 @@ import org.springframework.stereotype.Component;
 import io.github.kizulog_community.kizulog.domain.tenantaccountprofile.model.TenantAccountProfile;
 import io.github.kizulog_community.kizulog.domain.tenantaccountprofile.service.TenantAccountProfileService;
 import io.github.kizulog_community.kizulog.domain.tenantoidc.model.ClaimsMappingTarget;
-import io.github.kizulog_community.kizulog.domain.tenantoidc.model.TenantOidcProvider;
-import io.github.kizulog_community.kizulog.domain.tenantoidc.port.TenantOidcProviderRepository;
-import io.github.kizulog_community.kizulog.domain.tenantoidc.service.ClaimsMappingResolver;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.TenantUserPrincipal;
 import lombok.RequiredArgsConstructor;
 
 /**
  * テナント画面ヘッダ用ユーザ表示Resolver
+ *
+ * <p>プロファイルにはログイン時にマッピング解決済みの値（ターゲットキー→値）が
+ * 保存されているため、ここではプロバイダ参照やマッピング適用を行わず、保存値を
+ * 直接読み出して表示Viewを構築する。</p>
  *
  * @author Jun Kobayashi
  */
@@ -30,12 +31,6 @@ public class TenantUserDisplayResolver {
     /** プロファイルキャッシュService */
     private final TenantAccountProfileService profileService;
 
-    /** OIDCプロバイダリポジトリ */
-    private final TenantOidcProviderRepository providerRepository;
-
-    /** クレームマッピング解決Service（テナント用） */
-    private final ClaimsMappingResolver claimsMappingResolver;
-
     /**
      * Principalから表示用Viewを構築する。
      *
@@ -47,34 +42,21 @@ public class TenantUserDisplayResolver {
             return emptyView();
         }
 
-        // identity の最新プロファイルを取得
         Map<String, Object> claims = loadClaimsForIdentity(principal.getIdentityId());
 
-        // identity が属する provider を引く
-        TenantOidcProvider provider = findProviderForPrincipal(principal);
-        if (provider == null) {
-            log.debug("No provider found for tenant identity: identityId={}, iss={}, aud={}",
-                    principal.getIdentityId(), principal.getIss(), principal.getAud());
-            return emptyView();
-        }
-
-        // マッピング適用
-        Map<ClaimsMappingTarget, String> resolved =
-                claimsMappingResolver.resolve(provider, claims);
-
         return new TenantUserDisplayView(
-                resolved.get(ClaimsMappingTarget.FAMILY_NAME),
-                resolved.get(ClaimsMappingTarget.GIVEN_NAME),
-                resolved.get(ClaimsMappingTarget.MIDDLE_NAME),
-                resolved.get(ClaimsMappingTarget.ORGANIZATION),
-                resolved.get(ClaimsMappingTarget.EMAIL));
+                value(claims, ClaimsMappingTarget.FAMILY_NAME),
+                value(claims, ClaimsMappingTarget.GIVEN_NAME),
+                value(claims, ClaimsMappingTarget.MIDDLE_NAME),
+                value(claims, ClaimsMappingTarget.ORGANIZATION),
+                value(claims, ClaimsMappingTarget.EMAIL));
     }
 
     /**
-     * identity のキャッシュ済みクレームを取得する。
+     * identity の解決済みプロファイル（ターゲットキー→値）を取得する。
      *
      * @param identityId identity ID
-     * @return クレームMap、または取得失敗時の空Map
+     * @return 保存値Map、または取得失敗時の空Map
      */
     private Map<String, Object> loadClaimsForIdentity(String identityId) {
         if (identityId == null) {
@@ -92,29 +74,22 @@ public class TenantUserDisplayResolver {
     }
 
     /**
-     * Principal が属するOIDCプロバイダを特定する。
+     * 解決済みプロファイルから指定ターゲットの値を取り出す。
      *
-     * @param principal 現在のPrincipal
-     * @return プロバイダ、または該当なしの場合 null
+     * @param claims 解決済みプロファイル（ターゲットキー→値）
+     * @param target 取得対象
+     * @return 値（非空白）、または該当なしの場合 null
      */
-    private TenantOidcProvider findProviderForPrincipal(TenantUserPrincipal principal) {
-        String iss = principal.getIss();
-        String aud = principal.getAud();
-        String tenantId = principal.getTenantId();
-        if (iss == null || aud == null || tenantId == null) {
+    private static String value(Map<String, Object> claims, ClaimsMappingTarget target) {
+        if (claims == null) {
             return null;
         }
-        try {
-            return providerRepository.findAllLatestByIssAndAud(iss, aud).stream()
-                    .filter(p -> tenantId.equals(p.getTenantId()))
-                    .findFirst()
-                    .orElse(null);
-        } catch (RuntimeException e) {
-            log.warn("Failed to find provider for tenant identity: identityId={}, "
-                            + "iss={}, aud={}, error={}",
-                    principal.getIdentityId(), iss, aud, e.getMessage());
+        Object v = claims.get(target.getKey());
+        if (v == null) {
             return null;
         }
+        String s = v.toString();
+        return s.isBlank() ? null : s;
     }
 
     private TenantUserDisplayView emptyView() {

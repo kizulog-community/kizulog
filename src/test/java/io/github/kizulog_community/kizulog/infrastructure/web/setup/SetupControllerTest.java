@@ -317,10 +317,13 @@ class SetupControllerTest {
         BindingResult br = new BeanPropertyBindingResult(formData, "step2FormData");
         Model model = new ConcurrentModel();
 
+        when(oidcProviderService.resolveCanonicalIssuer("https://auth.example.com"))
+                .thenReturn("https://auth.example.com");
+
         String view = controller.step2Submit(formData, br, Locale.JAPAN, model);
 
         assertThat(view).isEqualTo("redirect:/setup/step3");
-        verify(oidcProviderService).verify("https://auth.example.com");
+        verify(oidcProviderService).resolveCanonicalIssuer("https://auth.example.com");
         assertThat(setupSessionData.getHost()).isEqualTo("kizulog.example.com");
         assertThat(setupSessionData.getOidcSettings()).hasSize(1);
         assertThat(setupSessionData.getOidcSettings().get(0).getId()).isEqualTo("master");
@@ -359,7 +362,7 @@ class SetupControllerTest {
         BindingResult br = new BeanPropertyBindingResult(formData, "step2FormData");
 
         Mockito.doThrow(new OidcConnectionException(OidcConnectionError.CONNECTION_ERROR))
-                .when(oidcProviderService).verify("https://bad.example.com");
+                .when(oidcProviderService).resolveCanonicalIssuer("https://bad.example.com");
         when(messageSource.getMessage(eq("oidc.error.connection"), any(), any(Locale.class)))
                 .thenReturn("接続失敗");
 

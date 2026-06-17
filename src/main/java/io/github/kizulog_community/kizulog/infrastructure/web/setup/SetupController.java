@@ -224,9 +224,11 @@ public class SetupController {
             return "setup/step2";
         }
 
-        // サーバー側でもOIDC接続確認を実施
+     // サーバー側でOIDC接続確認＋正準 issuer 解決
+        String canonicalIss;
         try {
-            oidcProviderService.verify(formData.getOidcSetting().getUri());
+            canonicalIss = oidcProviderService.resolveCanonicalIssuer(
+                    formData.getOidcSetting().getUri());
         } catch (OidcConnectionException e) {
             log.warn("Step2 OIDC接続確認失敗: uri={}, errorType={}",
                     formData.getOidcSetting().getUri(), e.getErrorType());
@@ -244,7 +246,10 @@ public class SetupController {
 
         setupSessionData.setHost(formData.getHost());
 
-        // T.0: 既存のclaimsMappingを保持しつつ、その他フィールドを上書き
+        // 正準化した issuer をセッションへ反映（最終登録時に正準値が保存される）
+        formData.getOidcSetting().setUri(canonicalIss);
+
+        // 既存のclaimsMappingを保持しつつ、その他フィールドを上書き
         OidcSetting newOidc = formData.getOidcSetting();
         newOidc.setId("master");
 
