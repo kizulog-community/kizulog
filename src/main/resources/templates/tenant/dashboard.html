@@ -11,6 +11,22 @@
 <div class="container py-4" style="max-width: 900px;">
 
     <!-- ============================================================ -->
+    <!-- flash メッセージ（打刻結果）                                  -->
+    <!-- ============================================================ -->
+    <div th:if="${flashSuccessKey != null}"
+         class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        <span th:text="#{__${flashSuccessKey}__}">成功しました</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+    <div th:if="${flashErrorKey != null}"
+         class="alert alert-warning alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        <span th:text="#{__${flashErrorKey}__}">エラーが発生しました</span>
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+    </div>
+
+    <!-- ============================================================ -->
     <!-- ページヘッダ                                                  -->
     <!-- ============================================================ -->
     <div class="d-flex justify-content-between align-items-center mb-4">
@@ -21,17 +37,102 @@
     </div>
 
     <!-- ============================================================ -->
-    <!-- ウェルカムカード                                              -->
+    <!-- 打刻パネル                                                    -->
     <!-- ============================================================ -->
-    <div class="card mb-4">
+    <div class="card mb-4" th:if="${attendancePanel != null}">
         <div class="card-body">
             <h5 class="card-title">
-                <i class="bi bi-emoji-smile me-2 text-primary"></i>
-                <span th:text="#{tenant.dashboard.welcome.title}">ようこそ</span>
+                <i class="bi bi-clock-history me-2 text-primary"></i>
+                <span th:text="#{tenant.attendance.panel.heading}">打刻</span>
             </h5>
-            <p class="card-text text-muted mb-0"
-               th:text="#{tenant.dashboard.welcome.description}">
-                KizuLog にログインしました。打刻などの機能は順次提供予定です。
+
+            <!-- 現在の勤務状態 -->
+            <p class="mb-3">
+                <span class="text-muted small me-2"
+                      th:text="#{tenant.attendance.state.label}">現在の状態</span>
+                <span class="badge"
+                      th:classappend="${attendancePanel.state.name() == 'WORKING'} ? 'bg-success'
+                          : (${attendancePanel.state.name() == 'ON_BREAK'} ? 'bg-warning text-dark' : 'bg-secondary')"
+                      th:text="#{__${'tenant.attendance.state.' + attendancePanel.state}__}">勤務外</span>
+            </p>
+
+            <!-- 打刻ボタン（種別ごとに独立フォーム・CSRFは自動付与） -->
+            <div class="d-flex flex-wrap gap-2">
+                <form th:action="@{/attendance/punch}" method="post" class="m-0">
+                    <input type="hidden" name="punchType" value="CLOCK_IN" />
+                    <button type="submit" class="btn btn-success"
+                            th:disabled="${!attendancePanel.canClockIn}">
+                        <i class="bi bi-box-arrow-in-right me-1"></i>
+                        <span th:text="#{tenant.attendance.button.clockIn}">出勤</span>
+                    </button>
+                </form>
+                <form th:action="@{/attendance/punch}" method="post" class="m-0">
+                    <input type="hidden" name="punchType" value="BREAK_START" />
+                    <button type="submit" class="btn btn-outline-secondary"
+                            th:disabled="${!attendancePanel.canBreakStart}">
+                        <i class="bi bi-cup-hot me-1"></i>
+                        <span th:text="#{tenant.attendance.button.breakStart}">休憩開始</span>
+                    </button>
+                </form>
+                <form th:action="@{/attendance/punch}" method="post" class="m-0">
+                    <input type="hidden" name="punchType" value="BREAK_END" />
+                    <button type="submit" class="btn btn-outline-secondary"
+                            th:disabled="${!attendancePanel.canBreakEnd}">
+                        <i class="bi bi-arrow-return-left me-1"></i>
+                        <span th:text="#{tenant.attendance.button.breakEnd}">休憩終了</span>
+                    </button>
+                </form>
+                <form th:action="@{/attendance/punch}" method="post" class="m-0">
+                    <input type="hidden" name="punchType" value="CLOCK_OUT" />
+                    <button type="submit" class="btn btn-danger"
+                            th:disabled="${!attendancePanel.canClockOut}">
+                        <i class="bi bi-box-arrow-right me-1"></i>
+                        <span th:text="#{tenant.attendance.button.clockOut}">退勤</span>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- 本日のセッション（進行中または直近完了）                       -->
+    <!-- ============================================================ -->
+    <div class="card mb-4" th:if="${attendancePanel != null}">
+        <div class="card-body">
+            <h5 class="card-title">
+                <i class="bi bi-list-check me-2 text-primary"></i>
+                <span th:text="#{tenant.attendance.session.heading}">直近のセッション</span>
+            </h5>
+
+            <!-- 打刻なし -->
+            <p class="text-muted small mb-0"
+               th:if="${#lists.isEmpty(attendancePanel.punches)}"
+               th:text="#{tenant.attendance.session.empty}">
+                まだ打刻がありません。
+            </p>
+
+            <!-- 打刻一覧 -->
+            <table class="table table-sm mb-2" th:unless="${#lists.isEmpty(attendancePanel.punches)}">
+                <thead>
+                    <tr>
+                        <th scope="col" th:text="#{tenant.attendance.session.col.type}">種別</th>
+                        <th scope="col" th:text="#{tenant.attendance.session.col.time}">時刻</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr th:each="row : ${attendancePanel.punches}">
+                        <td th:text="#{__${'tenant.attendance.punchType.' + row.punchType}__}">出勤</td>
+                        <td th:text="${row.timeText}">06/18 09:00</td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <!-- 表示タイムゾーンの注記 -->
+            <p class="text-muted small mb-0"
+               th:unless="${#lists.isEmpty(attendancePanel.punches)}">
+                <i class="bi bi-info-circle me-1"></i>
+                <span th:text="#{tenant.attendance.timezone.note}">表示時刻のタイムゾーン</span>
+                <code th:text="${attendancePanel.timezoneId}">Asia/Tokyo</code>
             </p>
         </div>
     </div>
@@ -90,12 +191,6 @@
         </div>
     </div>
 
-    <p class="text-center text-muted small mb-0">
-        <i class="bi bi-info-circle me-1"></i>
-        <span th:text="#{tenant.dashboard.footer}">
-            打刻などのテナント業務機能は今後のリリースで提供されます。
-        </span>
-    </p>
 </div>
 
 <!-- 共通フッタ -->

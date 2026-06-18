@@ -1,6 +1,9 @@
 package io.github.kizulog_community.kizulog.infrastructure.web.tenant;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
@@ -17,8 +20,13 @@ import org.springframework.security.oauth2.core.oidc.OidcIdToken;
 import org.springframework.ui.ConcurrentModel;
 import org.springframework.ui.Model;
 
+import io.github.kizulog_community.kizulog.domain.shared.SupportedTimezone;
+import io.github.kizulog_community.kizulog.domain.shared.TenantTimezoneResolver;
 import io.github.kizulog_community.kizulog.domain.tenant.model.Tenant;
 import io.github.kizulog_community.kizulog.domain.tenantaccount.model.TenantRole;
+import io.github.kizulog_community.kizulog.domain.tenantattendance.model.AttendanceSession;
+import io.github.kizulog_community.kizulog.domain.tenantattendance.model.WorkState;
+import io.github.kizulog_community.kizulog.domain.tenantattendance.service.TenantAttendanceService;
 import io.github.kizulog_community.kizulog.infrastructure.security.principal.TenantUserPrincipal;
 
 /**
@@ -36,11 +44,20 @@ class TenantDashboardControllerTest {
             OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC);
 
     private TenantDashboardController controller;
+    private TenantAttendanceService attendanceService;
+    private TenantTimezoneResolver timezoneResolver;
     private Model model;
 
     @BeforeEach
     void setUp() {
-        controller = new TenantDashboardController();
+        attendanceService = mock(TenantAttendanceService.class);
+        timezoneResolver = mock(TenantTimezoneResolver.class);
+        // 既定スタブ：未出勤・空セッション、表示TZはAsia/Tokyo
+        when(attendanceService.getCurrentSession(anyString()))
+                .thenReturn(new AttendanceSession(WorkState.NOT_WORKING, List.of()));
+        when(timezoneResolver.resolve(anyString(), anyString()))
+                .thenReturn(SupportedTimezone.of("Asia/Tokyo"));
+        controller = new TenantDashboardController(attendanceService, timezoneResolver);
         model = new ConcurrentModel();
     }
 
@@ -93,6 +110,16 @@ class TenantDashboardControllerTest {
     }
 
     @Test
+    @DisplayName("dashboard: principalがある場合は打刻パネルがmodelに設定される")
+    void dashboard_setsAttendancePanel_whenPrincipalPresent() {
+        TenantContext.set(tenant());
+
+        controller.dashboard(principal(Set.of(TenantRole.EMPLOYEE)), model);
+
+        assertThat(toMap(model).get("attendancePanel")).isNotNull();
+    }
+
+    @Test
     @DisplayName("dashboard: TenantContext未設定でもtenant=nullで画面を返す（NPEにならない）")
     void dashboard_noTenantContext_setsNullTenant() {
         String view = controller.dashboard(
@@ -103,7 +130,7 @@ class TenantDashboardControllerTest {
     }
 
     @Test
-    @DisplayName("dashboard: principalがnullでも画面を返す")
+    @DisplayName("dashboard: principalがnullでも画面を返す（打刻パネルは積まない）")
     void dashboard_nullPrincipal_returnsView() {
         TenantContext.set(tenant());
 
@@ -111,6 +138,7 @@ class TenantDashboardControllerTest {
 
         assertThat(view).isEqualTo("tenant/dashboard");
         assertThat(toMap(model).get("principal")).isNull();
+        assertThat(toMap(model).get("attendancePanel")).isNull();
     }
 
     @Test
